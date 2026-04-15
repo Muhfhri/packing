@@ -199,9 +199,50 @@
             "Beras Kencur": ["1000ml", "250ml"],
         };
 
-        let orders = JSON.parse(localStorage.getItem('orders')) || [];
+        // GANTI URL INI DENGAN URL WEB APP ANDA DARI GOOGLE APPS SCRIPT
+        const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxvCynn3mLe8MMjGF53XqgfMeThPwtbtBlHu8pDJH7z0jbC8alFVKWfUsgTgq7SGZtR/exec';
+
+        let orders = [];
         let productList = []; // Untuk menyimpan produk sementara di form
         let html5QrCode = null;
+        let isLoading = false;
+
+        // FUNGSI GOOGLE SHEETS
+        async function loadData() {
+            if (isLoading) return;
+            isLoading = true;
+            try {
+                const response = await fetch(GOOGLE_SHEETS_URL);
+                const result = await response.json();
+                if (result.success) {
+                    orders = result.data || [];
+                    render();
+                } else {
+                    showToast("Gagal memuat data dari Google Sheets: " + result.error, "danger");
+                }
+            } catch (error) {
+                showToast("Error loading data: " + error.message, "danger");
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        async function saveData() {
+            try {
+                const response = await fetch(GOOGLE_SHEETS_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orders)
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                showToast("Gagal menyimpan ke Google Sheets: " + error.message, "danger");
+                throw error;
+            }
+        }
 
         // FUNGSI NOTIFIKASI TOAST (Lebih cantik dari Alert)
         function showToast(message, type = "danger") {
@@ -624,7 +665,6 @@
                 `;
             }
 
-            localStorage.setItem('orders', JSON.stringify(orders));
         }
 
         // BUKA MODAL DETAIL
@@ -673,7 +713,7 @@
         };
 
         // AKSI FORM & CEK DUPLIKASI
-        document.getElementById('orderForm').onsubmit = (e) => {
+        document.getElementById('orderForm').onsubmit = async (e) => {
             e.preventDefault();
             const idx = document.getElementById('editIndex').value;
             const resiInput = document.getElementById('resi').value.toUpperCase().trim();
@@ -728,6 +768,8 @@
                 showToast("Data berhasil diubah!", "success");
             }
             
+            await saveData();
+            
             e.target.reset();
             resetEkspedisiManual();
             productList = [];
@@ -759,18 +801,19 @@
             addProduct();
         };
 
-        window.hapus = (i) => { 
+        window.hapus = async (i) => { 
             if(confirm('Hapus data pesanan ini?')) { 
                 orders.splice(i, 1); 
+                await saveData();
                 render(); 
                 showToast("Data dihapus", "success");
             } 
         };
 
-        window.hapusSemua = () => {
+        window.hapusSemua = async () => {
             if(confirm('Apakah Anda yakin ingin menghapus semua data pesanan? Tindakan ini tidak dapat dibatalkan.')) {
                 orders = [];
-                localStorage.removeItem('orders');
+                await saveData();
                 render();
                 showToast("Semua data berhasil dihapus!", "success");
             }
@@ -868,7 +911,9 @@
             return `${day}-${month}-${year}`;
         }
         // Render Awal
-        render();
+        loadData();
+        // Polling setiap 30 detik untuk sync dengan Google Sheets
+        setInterval(loadData, 30000);
     </script>
 </body>
 </html>
