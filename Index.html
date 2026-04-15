@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Manajemen Packing v5</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+        .card { border: none; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+        .card-header-custom { background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%); color: white; border-radius: 16px 16px 0 0 !important; padding: 1rem 1.5rem; }
+        
+        /* Ringkasan Produk Clickable */
+        .summary-box { background: #fff; border: 1px solid #e9ecef; border-left: 5px solid #198754; padding: 15px 20px; border-radius: 12px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; }
+        .summary-box:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.05); background-color: #f8fff9; border-left-color: #146c43; }
+        .product-title { font-weight: 800; color: #212529; font-size: 1.15rem; margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .size-detail { font-family: 'Consolas', 'Courier New', monospace; font-weight: 600; color: #495057; font-size: 0.95rem; }
+        
+        #reader { width: 100%; border-radius: 12px; background: #000; overflow: hidden; }
+        .table > :not(caption) > * > * { padding: 1rem 0.75rem; vertical-align: middle; }
+        .badge-exp { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; }
+        .bg-pink { background-color: #d63384 !important; color: white !important; }
+        .bg-purple { background-color: #6f42c1 !important; color: white !important; }
+        
+        /* Toast Alert Custom */
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1060; }
+    </style>
+</head>
+<body>
+
+    <div class="toast-container" id="toastArea"></div>
+
+    <div class="container py-4">
+        <header class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+            <h2 class="fw-bold text-dark m-0"><i class="bi bi-box-seam-fill text-primary"></i> PackingEasy</h2>
+            <div>
+                <div class="d-flex gap-2 mb-2">
+                    <input type="file" id="importCSV" class="d-none" accept=".csv">
+                    <button onclick="document.getElementById('importCSV').click()" class="btn btn-light border fw-bold text-secondary"><i class="bi bi-upload"></i> Impor</button>
+                    <button onclick="downloadCSV()" class="btn btn-success fw-bold"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button onclick="hapusSemua()" class="btn btn-danger fw-bold"><i class="bi bi-trash"></i> Hapus Semua</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="row g-4">
+            <div class="col-lg-4">
+                
+                <div class="card">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold text-muted m-0">RINGKASAN HARI INI</h6>
+                            <span class="badge bg-primary rounded-pill fs-6" id="statTotal">0</span>
+                        </div>
+                        <div id="rekapProdukArea">
+                            <p class="text-center text-muted small mt-4">Belum ada penjualan. Mulai scan resi!</p>
+                        </div>
+                        <small class="text-muted mt-2 d-block text-center"><i class="bi bi-info-circle"></i> Klik kotak di atas untuk melihat detail pembeli</small>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header-custom">
+                        <h6 class="fw-bold m-0"><i class="bi bi-upc-scan"></i> Input Pesanan</h6>
+                    </div>
+                    <div class="card-body p-4">
+                        <div id="cameraArea" class="d-none mb-3 text-center">
+                            <div id="reader"></div>
+                            <button type="button" onclick="killCamera()" class="btn btn-danger btn-sm w-100 mt-2 fw-bold"><i class="bi bi-camera-video-off"></i> Matikan Kamera</button>
+                        </div>
+
+                        <form id="orderForm">
+                            <input type="hidden" id="editIndex" value="-1">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-secondary">Nomor Resi</label>
+                                <div class="input-group">
+                                    <input type="text" id="resi" class="form-control font-monospace fw-bold text-primary" placeholder="Scan/Ketik..." required>
+                                    <button type="button" id="startBtn" class="btn btn-primary px-3"><i class="bi bi-qr-code-scan"></i></button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-secondary">Nama Pembeli</label>
+                                <input type="text" id="nama" class="form-control" placeholder="Contoh: Josep" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-secondary">Kota Pembeli</label>
+                                <input type="text" id="kota" class="form-control" placeholder="Contoh: Bandung" required>
+                            </div>
+                                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">Ekspedisi</label>
+                                    <div>
+                                        <select id="ekspedisi" class="form-select" onchange="toggleEkspedisiManual()" required>
+                                            <option value="JNE">JNE</option>
+                                            <option value="JNT">J&T</option>
+                                            <option value="SPX ID">SPX</option>
+                                            <option value="Anter Aja">Anter Aja</option>
+                                            <option value="Paxel">Paxel</option>
+                                            <option value="Gojek">Gojek</option>
+                                            <option value="Grab">Grab</option>
+                                            <option value="Manual">Tulis Manual</option>
+                                        </select>
+                                        <div id="ekspedisiManualContainer" class="input-group mt-2 d-none">
+                                            <input type="text" id="ekspedisiManual" class="form-control" placeholder="Tulis nama ekspedisi" />
+                                            <button type="button" class="btn btn-outline-secondary" onclick="resetEkspedisiManual()">Pilih dari daftar</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="productContainer" class="mb-3"></div>
+                            <button type="button" onclick="addProduct()" class="btn btn-outline-primary w-100 mt-3 fw-bold">+ Tambah Produk</button>
+                            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold text-uppercase tracking-wide"><i class="bi bi-save"></i> Simpan Data</button>
+                            <button type="button" id="btnBatal" class="btn btn-light border w-100 mt-2 d-none fw-bold">Batal Edit</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                <div class="card overflow-hidden">
+                    <div class="card-header bg-light">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Cari berdasarkan Resi, Nama, Produk, dll..." oninput="filterTable()">
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light text-secondary small">
+                                <tr>
+                                    <th class="ps-4">No</th>
+                                    <th>Resi & Kurir</th>
+                                    <th>Pembeli</th>
+                                    <th>Kota</th>
+                                    <th>Produk</th>
+                                    <th>Ukuran</th>
+                                    <th class="text-center">Qty</th>
+                                    <th>Batch</th>
+                                    <th>Exp</th>
+                                    <th>Waktu</th>
+                                    <th class="text-center pe-4">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold" id="modalTitle"><i class="bi bi-card-list"></i> Detail Penjualan</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="p-3 bg-light">
+                        <input type="text" id="modalSearchInput" class="form-control" placeholder="Cari di detail pembeli..." oninput="filterModal()">
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover m-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">No</th>
+                                    <th>Pembeli</th>
+                                    <th>Kota</th>
+                                    <th>Ukuran</th>
+                                    <th class="text-center">Qty</th>
+                                    <th>Batch</th>
+                                    <th>Exp</th>
+                                    <th>Resi</th>
+                                    <th>Kurir</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modalDetailBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const productData = {
+            "Madu Sarang": ["700gr"],
+            "Madu": ["700gr", "300gr"],
+            "Lemon": ["500ml", "250ml"],
+            "VCO": ["500ml", "250ml"],
+            "Garlic": ["500ml", "250ml"],
+            "Kunyit Asem": ["1000ml", "250ml"],
+            "Beras Kencur": ["1000ml", "250ml"],
+        };
+
+        let orders = JSON.parse(localStorage.getItem('orders')) || [];
+        let productList = []; // Untuk menyimpan produk sementara di form
+        let html5QrCode = null;
+
+        // FUNGSI NOTIFIKASI TOAST (Lebih cantik dari Alert)
+        function showToast(message, type = "danger") {
+            const toastArea = document.getElementById('toastArea');
+            const bgClass = type === "danger" ? "bg-danger" : "bg-success";
+            const iconClass = type === "danger" ? "bi-exclamation-triangle" : "bi-check-circle";
+            
+            const toastHtml = `
+                <div class="toast align-items-center text-white ${bgClass} border-0 show" role="alert" aria-live="assertive" aria-atomic="true" style="margin-bottom: 10px;">
+                    <div class="d-flex">
+                        <div class="toast-body fw-bold"><i class="bi ${iconClass} me-2"></i> ${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+            toastArea.insertAdjacentHTML('beforeend', toastHtml);
+            
+            // Hapus toast setelah 3 detik
+            const toastElements = toastArea.querySelectorAll('.toast');
+            const lastToast = toastElements[toastElements.length - 1];
+            setTimeout(() => {
+                lastToast.classList.remove('show');
+                setTimeout(() => lastToast.remove(), 300);
+            }, 3000);
+        }
+
+        // KAMERA - LOGIKA MATI TOTAL
+        async function killCamera() {
+            if (html5QrCode) {
+                try {
+                    await html5QrCode.stop();
+                    const video = document.querySelector('#reader video');
+                    if (video && video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+                } catch (e) {} 
+                finally {
+                    html5QrCode.clear();
+                    html5QrCode = null;
+                    document.getElementById('cameraArea').classList.add('d-none');
+                }
+            }
+        }
+
+        document.getElementById('startBtn').onclick = async () => {
+            document.getElementById('cameraArea').classList.remove('d-none');
+            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+            try {
+                await html5QrCode.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (text) => {
+                    document.getElementById('resi').value = text;
+                    document.getElementById('resi').dispatchEvent(new Event('input'));
+                    killCamera();
+                });
+            } catch (err) { 
+                showToast("Kamera gagal diakses. Pastikan izin diberikan.");
+                killCamera(); 
+            }
+        };
+
+        // AUTO DETEKSI EKSPEDISI
+        document.getElementById('resi').oninput = (e) => {
+            const val = e.target.value.toUpperCase().trim();
+            e.target.value = val; // Force uppercase & hilangkan spasi
+            const manualContainer = document.getElementById('ekspedisiManualContainer');
+            const exp = document.getElementById('ekspedisi');
+            if (manualContainer && manualContainer.classList.contains('d-none')) {
+                if (val.startsWith("1100")) exp.value = "Anter Aja";
+                else if (val.startsWith("SPXID")) exp.value = "SPX ID";
+                else if (val.startsWith("JX") || val.startsWith("JP")) exp.value = "JNT";
+                else if (/^\d{10,}$/.test(val)) exp.value = "JNE";
+            }
+        };
+
+        function updateSizes() {
+            const prod = document.getElementById('produk').value;
+            const select = document.getElementById('ukuran');
+            select.innerHTML = '';
+            if(productData[prod]) {
+                productData[prod].forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
+            }
+        }
+
+        window.toggleEkspedisiManual = function() {
+            const select = document.getElementById('ekspedisi');
+            const manualContainer = document.getElementById('ekspedisiManualContainer');
+            const manualInput = document.getElementById('ekspedisiManual');
+            if (select.value === 'Manual') {
+                select.style.display = 'none';
+                manualContainer.classList.remove('d-none');
+                manualInput.required = true;
+                manualInput.value = '';
+                manualInput.focus();
+            } else {
+                manualContainer.classList.add('d-none');
+                manualInput.required = false;
+                manualInput.value = '';
+                select.style.display = 'block';
+            }
+        }
+
+        window.resetEkspedisiManual = function() {
+            const select = document.getElementById('ekspedisi');
+            const manualContainer = document.getElementById('ekspedisiManualContainer');
+            const manualInput = document.getElementById('ekspedisiManual');
+            manualContainer.classList.add('d-none');
+            manualInput.required = false;
+            manualInput.value = '';
+            select.style.display = 'block';
+            select.value = 'JNE';
+        }
+
+        window.getEkspedisiValue = function() {
+            const manualContainer = document.getElementById('ekspedisiManualContainer');
+            const manualInput = document.getElementById('ekspedisiManual');
+            const select = document.getElementById('ekspedisi');
+            if (manualContainer && !manualContainer.classList.contains('d-none')) {
+                return manualInput.value.trim();
+            }
+            return select.value;
+        }
+
+        window.setEkspedisiValue = function(value) {
+            const select = document.getElementById('ekspedisi');
+            const manualContainer = document.getElementById('ekspedisiManualContainer');
+            const manualInput = document.getElementById('ekspedisiManual');
+            const optionExists = Array.from(select.options).some(opt => opt.value === value && opt.value !== 'Manual');
+            if (optionExists) {
+                manualContainer.classList.add('d-none');
+                manualInput.required = false;
+                manualInput.value = '';
+                select.style.display = 'block';
+                select.value = value;
+            } else {
+                select.style.display = 'none';
+                manualContainer.classList.remove('d-none');
+                manualInput.required = true;
+                manualInput.value = value || '';
+                select.value = 'Manual';
+            }
+        }
+
+        window.addProduct = function() {
+            const prodDate = productList.length > 0 ? productList[0].prodDate || '' : '';
+            productList.push({produk: '', ukuran: '', qty: 1, batch: '', exp: '', prodDate: prodDate});
+            renderProductContainer();
+        }
+
+        window.addProductItem = function(produk, ukuran, qty, index) {
+            const container = document.getElementById('productContainer');
+            const div = document.createElement('div');
+            div.className = 'product-item border rounded p-3 mb-2 bg-light';
+            div.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Produk ${index + 1}</span>
+                    <button type="button" onclick="removeProduct(${index})" class="btn btn-sm btn-outline-danger">Hapus</button>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <select class="form-select produk-select" onchange="updateProductFields(${index})" required>
+                            <option value="">-- Pilih --</option>
+                            <option value="Madu Sarang">Madu Sarang</option>
+                            <option value="Madu">Madu</option>
+                            <option value="Lemon">Lemon</option>
+                            <option value="Garlic">Garlic</option>
+                            <option value="VCO">VCO</option>
+                            <option value="Beras Kencur">Beras Kencur</option>
+                            <option value="Kunyit Asem">Kunyit Asem</option>
+                        </select>
+                    </div>
+                    <div class="col-3">
+                        <select class="form-select ukuran-select" required onchange="productList[${index}].ukuran = this.value"></select>
+                    </div>
+                    <div class="col-3">
+                        <input type="number" class="form-control qty-input text-center" min="1" value="1" required onchange="productList[${index}].qty = this.value">
+                    </div>
+                </div>
+                <div class="batch-exp-container" style="display: none;">
+                    <div class="row">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Tanggal Produksi</label>
+                            <input type="date" class="form-control prod-date" onchange="calculateBatchExp(${index})">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Batch & Exp</label>
+                            <input type="text" class="form-control batch-exp-display" readonly>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+            // Set values
+            div.querySelector('.produk-select').value = produk;
+            div.querySelector('.qty-input').value = qty;
+            if (productList[index].prodDate) {
+                div.querySelector('.prod-date').value = productList[index].prodDate;
+            }
+            if (produk) {
+                updateProductFields(index);
+                updateSizesForProduct(index);
+            }
+            div.querySelector('.ukuran-select').value = ukuran;
+            // Set batch/exp if exists
+            if (productList[index].batch || productList[index].exp) {
+                div.querySelector('.batch-exp-display').value = (productList[index].batch ? 'Batch: ' + productList[index].batch : '') + (productList[index].exp ? (productList[index].batch ? ' | ' : '') + 'Exp: ' + productList[index].exp : '');
+            }
+        }
+
+        window.updateProductFields = function(index) {
+            const produk = document.querySelectorAll('.produk-select')[index].value;
+            const container = document.querySelectorAll('.batch-exp-container')[index];
+            productList[index].produk = produk;
+            if (produk === 'Madu' || produk === 'Madu Sarang' || produk === 'VCO' || produk === 'Garlic' || produk === 'Lemon' || produk === 'Kunyit Asem' || produk === 'Beras Kencur') {
+                container.style.display = 'block';
+                if (productList[index].prodDate) {
+                    calculateBatchExp(index);
+                }
+            } else {
+                container.style.display = 'none';
+                productList[index].batch = '';
+                productList[index].exp = '';
+                productList[index].prodDate = '';
+            }
+            updateSizesForProduct(index);
+        }
+
+        window.calculateBatchExp = function(index) {
+            const prodDateInput = document.querySelectorAll('.prod-date')[index];
+            const display = document.querySelectorAll('.batch-exp-display')[index];
+            const produk = productList[index].produk;
+            const prodDate = prodDateInput.value;
+            productList[index].prodDate = prodDate;
+            if (!prodDate) {
+                display.value = '';
+                productList[index].batch = '';
+                productList[index].exp = '';
+                return;
+            }
+            const date = new Date(prodDate);
+            let batch = '';
+            let exp = '';
+            if (produk === 'Madu') {
+                batch = '1.' + formatDate(date);
+                const expDate = new Date(date);
+                expDate.setFullYear(expDate.getFullYear() + 2);
+                exp = formatDate(expDate);
+            } else if (produk === 'Madu Sarang') {
+                batch = '2.' + formatDate(date);
+                const expDate = new Date(date);
+                expDate.setFullYear(expDate.getFullYear() + 2);
+                exp = formatDate(expDate);
+            } else if (produk === 'VCO') {
+                batch = '5.' + formatDate(date);
+                const expDate = new Date(date);
+                expDate.setFullYear(expDate.getFullYear() + 2);
+                exp = formatDate(expDate);
+            } else if (produk === 'Garlic') {
+                batch = '6.' + formatDate(date);
+                const expDate = new Date(date);
+                expDate.setMonth(expDate.getMonth() + 5);
+                exp = formatDate(expDate);
+            } else if (produk === 'Lemon') {
+                batch = '4.' + formatDate(date);
+                const expDate = new Date(date);
+                expDate.setMonth(expDate.getMonth() + 5);
+                exp = formatDate(expDate);
+            } else if (produk === 'Kunyit Asem') {
+                batch = '7.' + formatDate(date);
+                const expDate = new Date(date);
+                expDate.setDate(expDate.getDate() + 7);
+                exp = formatDate(expDate);
+            } else if (produk === 'Beras Kencur') {
+                batch = '8.' + formatDate(date);
+                const expDate = new Date(date);
+                expDate.setDate(expDate.getDate() + 7);
+                exp = formatDate(expDate);
+            }
+            productList[index].batch = batch;
+            productList[index].exp = exp;
+            display.value = (batch ? 'Batch: ' + batch : '') + (exp ? (batch ? ' | ' : '') + 'Exp: ' + exp : '');
+        }
+
+        window.filterModal = function() {
+            const query = document.getElementById('modalSearchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#modalDetailBody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const visible = text.includes(query);
+                row.style.display = visible ? '' : 'none';
+            });
+        }
+
+        window.filterTable = function() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#tableBody tr');
+            const ordersVisibility = {};
+            rows.forEach(row => {
+                const orderIndex = row.getAttribute('data-order');
+                const text = row.textContent.toLowerCase();
+                if (!ordersVisibility[orderIndex]) ordersVisibility[orderIndex] = false;
+                if (text.includes(query)) ordersVisibility[orderIndex] = true;
+            });
+            rows.forEach(row => {
+                const orderIndex = row.getAttribute('data-order');
+                const visible = ordersVisibility[orderIndex];
+                row.style.display = visible ? '' : 'none';
+            });
+        }
+
+        window.removeProduct = function(index) {
+            productList.splice(index, 1);
+            renderProductContainer();
+        }
+
+        window.renderProductContainer = function() {
+            const container = document.getElementById('productContainer');
+            container.innerHTML = '';
+            productList.forEach((p, i) => addProductItem(p.produk, p.ukuran, p.qty, i));
+        }
+
+        window.updateSizesForProduct = function(index) {
+            const produkSelect = document.querySelectorAll('.produk-select')[index];
+            if (!produkSelect) return; // Safety check
+            const produk = productList[index].produk = produkSelect.value;
+            const select = document.querySelectorAll('.ukuran-select')[index];
+            select.innerHTML = '';
+            if (productData[produk]) {
+                productData[produk].forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
+            }
+            productList[index].ukuran = select.value;
+        }
+
+        function formatDate(date) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+        }
+
+        // FUNGSI RENDER & REKAP
+        function render() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            const summary = {}; 
+            let globalNo = 1; 
+
+            orders.forEach((o, orderIndex) => {
+                o.products.forEach((p, productIndex) => {
+                    const isFirst = productIndex === 0;
+                    const rowspan = isFirst ? `rowspan="${o.products.length}"` : '';
+                    const aksi = isFirst ? `<button onclick="edit(${orderIndex})" class="btn btn-sm btn-outline-warning me-1" title="Edit"><i class="bi bi-pencil-fill"></i></button>
+                        <button onclick="hapus(${orderIndex})" class="btn btn-sm btn-outline-danger" title="Hapus"><i class="bi bi-trash-fill"></i></button>` : '';
+
+                    // Logika Summary Group
+                    if(!summary[p.produk]) summary[p.produk] = {};
+                    if(!summary[p.produk][p.ukuran]) summary[p.produk][p.ukuran] = { count: 0, items: [] };
+                    
+                    summary[p.produk][p.ukuran].count += parseInt(p.kuantitas);
+                    summary[p.produk][p.ukuran].items.push({...o, produk: p.produk, ukuran: p.ukuran, kuantitas: p.kuantitas, batch: p.batch, exp: p.exp});
+
+                    let expColor = "bg-secondary";
+                    if(o.ekspedisi === "JNE") expColor = "bg-primary";
+                    if(o.ekspedisi === "JNT") expColor = "bg-danger";
+                    if(o.ekspedisi === "SPX ID") expColor = "bg-warning text-dark";
+                    if(o.ekspedisi === "Anter Aja") expColor = "bg-pink";
+                    if(o.ekspedisi === "Paxel") expColor = "bg-purple";
+                    if(o.ekspedisi === "Gojek" || o.ekspedisi === "Grab") expColor = "bg-success";
+                    const isEdited = o.updatedAt && o.updatedAt !== o.createdAt;
+                    const rowBg = isEdited ? "bg-warning bg-opacity-25" : "";
+
+                    tbody.innerHTML += `
+                    <tr data-order="${orderIndex}" class="${rowBg}">
+                        ${isFirst ? `<td class="ps-4" ${rowspan}>${globalNo++}</td>
+                        <td ${rowspan}>
+                            <div class="font-monospace fw-bold text-dark mb-1" style="font-size: 0.9rem;">${o.resi}</div>
+                            <span class="badge ${expColor} badge-exp">${o.ekspedisi}</span>
+                        </td>
+                        <td class="fw-semibold text-secondary" ${rowspan}>${o.nama}</td>
+                        <td class="text-secondary" ${rowspan}>${o.kota || ''}</td>` : ''}
+                        <td>${p.produk}</td>
+                        <td><span class="badge bg-light text-secondary border">${p.ukuran}</span></td>
+                        <td class="text-center">
+                            <span class="badge bg-success fs-6 rounded-circle p-2">${p.kuantitas}</span>
+                        </td>
+                        <td>${p.batch ? p.batch : ''}</td>
+                        <td>${p.exp ? p.exp : ''}</td>
+                        ${isFirst ? `<td class="small text-nowrap" ${rowspan}>${o.createdAt || ''}<br><small class="text-muted">${isEdited ? '(Edit: ' + o.updatedAt + ')' : ''}</small></td>` : ''}
+                        ${isFirst ? `<td class="text-center pe-4" ${rowspan}>${aksi}</td>` : ''}
+                    </tr>`;
+                });
+            });
+
+            document.getElementById('statTotal').textContent = orders.length;
+            const area = document.getElementById('rekapProdukArea');
+            if (orders.length === 0) {
+                area.innerHTML = '<p class="text-center text-muted small mt-4">Belum ada pesanan masuk hari ini.</p>';
+                return;
+            }
+            area.innerHTML = '';
+
+            // Tampilkan Rekap & Simpan data ke window untuk Modal
+            window.modalData = summary;
+
+            for (const productName in summary) {
+                const sizes = summary[productName];
+                let sizeStrings = [];
+                let totalProductCount = 0;
+                
+                for (const sizeName in sizes) {
+                    sizeStrings.push(`${sizeName}: <span class="text-primary">${sizes[sizeName].count}</span>`);
+                    totalProductCount += sizes[sizeName].count;
+                }
+
+                area.innerHTML += `
+                    <div class="summary-box" onclick="bukaModalDetail('${productName}')" title="Klik untuk lihat detail pembeli">
+                        <div class="product-title">
+                            <span>${productName}</span>
+                            <span class="badge bg-light text-success border"><i class="bi bi-box"></i> ${totalProductCount}</span>
+                        </div>
+                        <div class="size-detail">${sizeStrings.join(' <span class="text-muted fw-normal">|</span> ')}</div>
+                    </div>
+                `;
+            }
+
+            localStorage.setItem('orders', JSON.stringify(orders));
+        }
+
+        // BUKA MODAL DETAIL
+        window.bukaModalDetail = (productName) => {
+            const data = window.modalData[productName];
+            document.getElementById('modalTitle').innerHTML = `<i class="bi bi-card-list"></i> Detail Pembeli: ${productName}`;
+            
+            const tbody = document.getElementById('modalDetailBody');
+            tbody.innerHTML = '';
+
+            // Group by nama pembeli + resi untuk menyatukan baris
+            const grouped = {};
+            for (const sizeName in data) {
+                data[sizeName].items.forEach(item => {
+                    const key = `${item.nama}||${item.resi}`;
+                    if (!grouped[key]) {
+                        grouped[key] = { nama: item.nama, kota: item.kota || '', resi: item.resi, ekspedisi: item.ekspedisi, rows: [] };
+                    }
+                    grouped[key].rows.push(item);
+                });
+            }
+
+            let modalCounter = 1;
+            for (const key in grouped) {
+                const group = grouped[key];
+                group.rows.forEach((item, rowIndex) => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="ps-3">${rowIndex === 0 ? modalCounter++ : ''}</td>
+                            <td class="fw-bold text-secondary">${rowIndex === 0 ? group.nama : ''}</td>
+                            <td class="text-secondary">${rowIndex === 0 ? group.kota || '' : ''}</td>
+                            <td><span class="badge border text-dark">${item.ukuran}</span></td>
+                            <td class="text-center fw-bold text-success">${item.kuantitas}</td>
+                            <td>${item.batch ? item.batch : ''}</td>
+                            <td>${item.exp ? item.exp : ''}</td>
+                            <td class="font-monospace small">${rowIndex === 0 ? group.resi : ''}</td>
+                            <td><span class="badge bg-secondary">${rowIndex === 0 ? group.ekspedisi : ''}</span></td>
+                        </tr>
+                    `;
+                });
+            }
+
+            document.getElementById('modalSearchInput').value = '';
+            const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+            modal.show();
+        };
+
+        // AKSI FORM & CEK DUPLIKASI
+        document.getElementById('orderForm').onsubmit = (e) => {
+            e.preventDefault();
+            const idx = document.getElementById('editIndex').value;
+            const resiInput = document.getElementById('resi').value.toUpperCase().trim();
+            
+            // Collect products
+            const products = productList.map(p => ({ produk: p.produk, ukuran: p.ukuran, kuantitas: p.qty, batch: p.batch || '', exp: p.exp || '', prodDate: p.prodDate || '' }));
+            
+            if (products.length === 0 || products.some(p => !p.produk || !p.ukuran || !p.kuantitas)) {
+                showToast("Harus isi semua produk dengan lengkap!", "danger");
+                return;
+            }
+            const ekspedisi = getEkspedisiValue();
+            if (!ekspedisi) {
+                showToast("Harap isi ekspedisi manual jika memilih Tulis Manual!", "danger");
+                return;
+            }
+            
+            // --- LOGIKA CEK RESI DUPLIKAT ---
+            if (idx === "-1") {
+                // Saat tambah data baru
+                const isDuplicate = orders.some(o => o.resi === resiInput);
+                if (isDuplicate) {
+                    showToast(`Resi <b>${resiInput}</b> sudah ada di daftar!`, "danger");
+                    return; // Hentikan proses simpan
+                }
+            } else {
+                // Saat edit data, cek apakah resi dipakai oleh index lain
+                const isDuplicate = orders.some((o, index) => o.resi === resiInput && index.toString() !== idx);
+                if (isDuplicate) {
+                    showToast(`Resi <b>${resiInput}</b> bentrok dengan pesanan lain!`, "danger");
+                    return; // Hentikan proses simpan
+                }
+            }
+
+            const data = {
+                nama: document.getElementById('nama').value,
+                kota: document.getElementById('kota').value,
+                resi: resiInput,
+                ekspedisi: ekspedisi,
+                products: products,
+                createdAt: idx === "-1" ? new Date().toLocaleString('id-ID') : orders[idx].createdAt,
+                updatedAt: new Date().toLocaleString('id-ID')
+            };
+            
+            if(idx === "-1") {
+                orders.push(data); // Tambah ke akhir sehingga entri pertama tetap nomor 1
+                showToast("Data berhasil ditambahkan!", "success");
+            } else { 
+                orders[idx] = data;
+                document.getElementById('editIndex').value = "-1"; 
+                document.getElementById('btnBatal').classList.add('d-none');
+                showToast("Data berhasil diubah!", "success");
+            }
+            
+            e.target.reset();
+            resetEkspedisiManual();
+            productList = [];
+            renderProductContainer();
+            addProduct(); // Reset to one product
+            render();
+        };
+
+        window.edit = (i) => {
+            const o = orders[i];
+            document.getElementById('nama').value = o.nama;
+            document.getElementById('kota').value = o.kota || '';
+            document.getElementById('resi').value = o.resi;
+            setEkspedisiValue(o.ekspedisi);
+            productList = o.products.map(p => ({produk: p.produk, ukuran: p.ukuran, qty: p.kuantitas, batch: p.batch || '', exp: p.exp || '', prodDate: p.prodDate || ''}));
+            renderProductContainer();
+            document.getElementById('editIndex').value = i;
+            document.getElementById('btnBatal').classList.remove('d-none');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        document.getElementById('btnBatal').onclick = () => {
+            document.getElementById('orderForm').reset();
+            resetEkspedisiManual();
+            document.getElementById('editIndex').value = "-1";
+            document.getElementById('btnBatal').classList.add('d-none');
+            productList = [];
+            renderProductContainer();
+            addProduct();
+        };
+
+        window.hapus = (i) => { 
+            if(confirm('Hapus data pesanan ini?')) { 
+                orders.splice(i, 1); 
+                render(); 
+                showToast("Data dihapus", "success");
+            } 
+        };
+
+        window.hapusSemua = () => {
+            if(confirm('Apakah Anda yakin ingin menghapus semua data pesanan? Tindakan ini tidak dapat dibatalkan.')) {
+                orders = [];
+                localStorage.removeItem('orders');
+                render();
+                showToast("Semua data berhasil dihapus!", "success");
+            }
+        };
+
+        // IMPORT / EKSPORT CSV
+        function downloadCSV() {
+            if(orders.length === 0) return showToast("Tidak ada data untuk diunduh!");
+            let csv = "Nama,Kota,Resi,Ekspedisi,Produk,Ukuran,Qty,Batch,Exp,ProdDate,CreatedAt,UpdatedAt\n";
+            orders.forEach(o => {
+                o.products.forEach(p => csv += `"${o.nama}","${o.kota || ''}","${o.resi}","${o.ekspedisi}","${p.produk}","${p.ukuran}","${p.kuantitas}","${p.batch || ''}","${p.exp || ''}","${p.prodDate || ''}","${o.createdAt || ''}","${o.updatedAt || ''}"\n`);
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'rekap_penjualan.csv'; a.click();
+        }
+
+        document.getElementById('importCSV').onchange = (e) => {
+            const r = new FileReader();
+            r.onload = (ev) => {
+                const rows = ev.target.result.split('\n').slice(1);
+                const grouped = {};
+                rows.filter(l => l.trim()).forEach(l => {
+                    const c = l.split(',').map(v => v.replace(/"/g, ''));
+                    let nama = c[0];
+                    let kota = '';
+                    let resi = '';
+                    let ekspedisi = '';
+                    let produk = '';
+                    let ukuran = '';
+                    let kuantitas = '';
+                    let batch = '';
+                    let exp = '';
+                    let prodDate = '';
+                    let createdAt = '';
+                    let updatedAt = '';
+                    if (c.length >= 12) {
+                        nama = c[0];
+                        kota = c[1];
+                        resi = c[2];
+                        ekspedisi = c[3];
+                        produk = c[4];
+                        ukuran = c[5];
+                        kuantitas = c[6];
+                        batch = c[7] || '';
+                        exp = c[8] || '';
+                        prodDate = c[9] || '';
+                        createdAt = c[10] || '';
+                        updatedAt = c[11] || '';
+                    } else if (c.length >= 10) {
+                        nama = c[0];
+                        kota = c[1];
+                        resi = c[2];
+                        ekspedisi = c[3];
+                        produk = c[4];
+                        ukuran = c[5];
+                        kuantitas = c[6];
+                        batch = c[7] || '';
+                        exp = c[8] || '';
+                        prodDate = c[9] || '';
+                    } else if (c.length >= 7) {
+                        nama = c[0];
+                        kota = c[1];
+                        resi = c[2];
+                        ekspedisi = c[3];
+                        produk = c[4];
+                        ukuran = c[5];
+                        kuantitas = c[6];
+                    } else {
+                        nama = c[0];
+                        resi = c[1];
+                        ekspedisi = c[2];
+                        produk = c[3];
+                        ukuran = c[4];
+                        kuantitas = c[5];
+                    }
+                    const key = resi;
+                    if (!grouped[key]) grouped[key] = { nama, kota, resi, ekspedisi, products: [], createdAt: createdAt || new Date().toLocaleString('id-ID'), updatedAt: updatedAt || new Date().toLocaleString('id-ID') };
+                    grouped[key].products.push({ produk, ukuran, kuantitas, batch, exp, prodDate });
+                });
+                const importedOrders = Object.values(grouped);
+                if(confirm(`Timpa tabel dengan ${importedOrders.length} data baru?`)) {
+                    orders = importedOrders;
+                    render();
+                    showToast("Data berhasil diimpor!", "success");
+                }
+            };
+            r.readAsText(e.target.files[0]);
+        };
+        function formatDate(date) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+        }
+        // Render Awal
+        render();
+    </script>
+</body>
+</html>
