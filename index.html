@@ -24,8 +24,23 @@
         .bg-pink { background-color: #d63384 !important; color: white !important; }
         .bg-purple { background-color: #6f42c1 !important; color: white !important; }
         
+        /* Duplicate Resi Warning - Enhanced */
+        .is-invalid { 
+            border-color: #dc3545 !important; 
+            background-color: #fff5f5 !important; 
+            box-shadow: inset 0 1px 3px rgba(220, 53, 69, 0.1) !important;
+        }
+        .is-invalid:focus { 
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25), inset 0 1px 3px rgba(220, 53, 69, 0.1) !important; 
+            border-color: #dc3545 !important; 
+        }
+        
         /* Toast Alert Custom */
-        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1060; }
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1060; width: auto; max-width: 360px; }
+        .toast-container .toast { transform: translateX(120%); opacity: 0; transition: transform 0.35s ease, opacity 0.35s ease; }
+        .toast-container .toast.show { transform: translateX(0); opacity: 1; }
+        .toast-container .toast.hide-right { transform: translateX(120%); opacity: 0; }
+        .toast-container .toast .toast-body { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
     </style>
 </head>
 <body>
@@ -80,6 +95,9 @@
                                 <div class="input-group">
                                     <input type="text" id="resi" class="form-control font-monospace fw-bold text-primary" placeholder="Scan/Ketik..." required>
                                     <button type="button" id="startBtn" class="btn btn-primary px-3"><i class="bi bi-qr-code-scan"></i></button>
+                                </div>
+                                <div id="resiErrorMsg" class="text-danger small fw-bold mt-1 d-none">
+                                    <i class="bi bi-exclamation-circle"></i> Resi yang anda tulis sudah ada
                                 </div>
                             </div>
                             <div class="mb-3">
@@ -200,14 +218,15 @@
         };
 
         // GANTI URL INI DENGAN URL WEB APP ANDA DARI GOOGLE APPS SCRIPT
-        const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxvCynn3mLe8MMjGF53XqgfMeThPwtbtBlHu8pDJH7z0jbC8alFVKWfUsgTgq7SGZtR/exec';
+        const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxdlrwZIr3KfTfZd-gfiq475LENrIaezSAK7HwNYpNGUxqQ_bkMEy2FfeZx3Y1_Nj-Z/exec';
 
         let orders = [];
         let productList = []; // Untuk menyimpan produk sementara di form
         let html5QrCode = null;
         let isLoading = false;
+        let isDataLoaded = false; // Flag untuk tracking apakah initial load selesai
 
-        // FUNGSI GOOGLE SHEETS
+        // FUNGSI GOOGLE SHEETS - dengan localStorage backup
         async function loadData() {
             if (isLoading) return;
             isLoading = true;
@@ -216,32 +235,83 @@
                 const result = await response.json();
                 if (result.success) {
                     orders = result.data || [];
+                    // Simpan ke localStorage sebagai backup
+                    localStorage.setItem('orders', JSON.stringify(orders));
+                    console.log('✓ Data loaded from Google Sheets:', orders.length, 'orders');
                     render();
                 } else {
-                    showToast("Gagal memuat data dari Google Sheets: " + result.error, "danger");
+                    // Fallback ke localStorage
+                    const backupData = localStorage.getItem('orders');
+                    orders = backupData ? JSON.parse(backupData) : [];
+                    console.log('⚠️ Using backup from localStorage:', orders.length, 'orders');
+                    render();
                 }
             } catch (error) {
-                showToast("Error loading data: " + error.message, "danger");
+                console.warn("Gagal fetch dari Google Sheets, gunakan backup:", error);
+                // Fallback ke localStorage jika fetch error
+                const backupData = localStorage.getItem('orders');
+                orders = backupData ? JSON.parse(backupData) : [];
+                console.log('⚠️ Using backup from localStorage:', orders.length, 'orders');
+                render();
             } finally {
                 isLoading = false;
+                isDataLoaded = true;
+                // Unlock form submit button
+                const submitBtn = document.querySelector('#orderForm button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = false;
             }
         }
 
         async function saveData() {
-            try {
-                const response = await fetch(GOOGLE_SHEETS_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(orders)
-                });
-                const result = await response.json();
-                if (!result.success) {
-                    throw new Error(result.error);
+            return new Promise((resolve, reject) => {
+                console.log('Saving data to Google Sheets:', orders);
+                
+                // STEP 1: Simpan ke localStorage DULU sebagai backup
+                try {
+                    localStorage.setItem('orders', JSON.stringify(orders));
+                    console.log('✓ Data saved to localStorage');
+                } catch (error) {
+                    console.error('✗ Gagal save ke localStorage:', error);
                 }
-            } catch (error) {
-                showToast("Gagal menyimpan ke Google Sheets: " + error.message, "danger");
-                throw error;
-            }
+                
+                // STEP 2: Cek apakah URL sudah diisi
+                if (!GOOGLE_SHEETS_URL || GOOGLE_SHEETS_URL.includes('YOUR_SCRIPT_ID')) {
+                    alert('⚠️ URL Google Sheets belum dikonfigurasi!\n\nGanti GOOGLE_SHEETS_URL di Index.html dengan URL web app Anda.');
+                    resolve();
+                    return;
+                }
+                
+                // STEP 3: Kirim ke Google Sheets via iframe
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.name = 'saveFrame_' + Date.now();
+                document.body.appendChild(iframe);
+
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = GOOGLE_SHEETS_URL;
+                form.target = iframe.name;
+
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'data';
+                input.value = JSON.stringify(orders);
+                form.appendChild(input);
+
+                document.body.appendChild(form);
+                console.log('📤 Mengirim data ke Google Sheets...');
+                form.submit();
+
+                setTimeout(() => {
+                    try {
+                        document.body.removeChild(form);
+                        document.body.removeChild(iframe);
+                    } catch (e) {}
+                    console.log('✓ Data send attempt completed');
+                    showToast('Data disimpan! (Local + Google Sheets)', 'success');
+                    resolve();
+                }, 1500);
+            });
         }
 
         // FUNGSI NOTIFIKASI TOAST (Lebih cantik dari Alert)
@@ -249,23 +319,40 @@
             const toastArea = document.getElementById('toastArea');
             const bgClass = type === "danger" ? "bg-danger" : "bg-success";
             const iconClass = type === "danger" ? "bi-exclamation-triangle" : "bi-check-circle";
-            
-            const toastHtml = `
-                <div class="toast align-items-center text-white ${bgClass} border-0 show" role="alert" aria-live="assertive" aria-atomic="true" style="margin-bottom: 10px;">
-                    <div class="d-flex">
-                        <div class="toast-body fw-bold"><i class="bi ${iconClass} me-2"></i> ${message}</div>
-                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                    </div>
-                </div>
-            `;
-            toastArea.insertAdjacentHTML('beforeend', toastHtml);
-            
-            // Hapus toast setelah 3 detik
-            const toastElements = toastArea.querySelectorAll('.toast');
-            const lastToast = toastElements[toastElements.length - 1];
+
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white ${bgClass} border-0`;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            toast.style.marginBottom = '10px';
+
+            const toastBody = document.createElement('div');
+            toastBody.className = 'toast-body fw-bold d-flex align-items-center justify-content-between';
+            toastBody.innerHTML = `<span><i class="bi ${iconClass} me-2"></i> ${message}</span>`;
+
+            const closeButton = document.createElement('button');
+            closeButton.type = 'button';
+            closeButton.className = 'btn-close btn-close-white ms-2';
+            closeButton.setAttribute('aria-label', 'Close');
+            closeButton.addEventListener('click', () => {
+                toast.classList.remove('show');
+                toast.classList.add('hide-right');
+                setTimeout(() => toast.remove(), 300);
+            });
+
+            toastBody.appendChild(closeButton);
+            toast.appendChild(toastBody);
+            toastArea.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+
             setTimeout(() => {
-                lastToast.classList.remove('show');
-                setTimeout(() => lastToast.remove(), 300);
+                toast.classList.remove('show');
+                toast.classList.add('hide-right');
+                setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
 
@@ -300,10 +387,50 @@
             }
         };
 
-        // AUTO DETEKSI EKSPEDISI
+        function normalizeResi(value) {
+            return value ? value.toString().toUpperCase().trim() : '';
+        }
+
+        function isDuplicateResi(resi, excludeIndex = -1) {
+            const normalizedResi = normalizeResi(resi);
+            if (!normalizedResi) return false;
+
+            const duplicateInOrders = orders.some((o, idx) => normalizeResi(o.resi) === normalizedResi && idx !== excludeIndex);
+            if (duplicateInOrders) return true;
+
+            const backupData = localStorage.getItem('orders');
+            if (backupData) {
+                try {
+                    const backupOrders = JSON.parse(backupData);
+                    return backupOrders.some((o, idx) => normalizeResi(o.resi) === normalizedResi && idx !== excludeIndex);
+                } catch (e) {
+                    console.error('Gagal parse localStorage orders untuk duplicate check', e);
+                }
+            }
+
+            return false;
+        }
+
+        function setResiErrorState(show) {
+            const resiInput = document.getElementById('resi');
+            const errorMsg = document.getElementById('resiErrorMsg');
+            if (show) {
+                resiInput.classList.add('is-invalid');
+                errorMsg.classList.remove('d-none');
+            } else {
+                resiInput.classList.remove('is-invalid');
+                errorMsg.classList.add('d-none');
+            }
+        }
+
+        // AUTO DETEKSI EKSPEDISI & VALIDASI DUPLIKAT REAL-TIME
         document.getElementById('resi').oninput = (e) => {
-            const val = e.target.value.toUpperCase().trim();
+            const val = normalizeResi(e.target.value);
             e.target.value = val; // Force uppercase & hilangkan spasi
+            const currentIndex = parseInt(document.getElementById('editIndex').value, 10);
+            const hasDuplicate = isDuplicateResi(val, currentIndex);
+            setResiErrorState(val && hasDuplicate);
+            
             const manualContainer = document.getElementById('ekspedisiManualContainer');
             const exp = document.getElementById('ekspedisi');
             if (manualContainer && manualContainer.classList.contains('d-none')) {
@@ -435,7 +562,8 @@
             div.querySelector('.produk-select').value = produk;
             div.querySelector('.qty-input').value = qty;
             if (productList[index].prodDate) {
-                div.querySelector('.prod-date').value = productList[index].prodDate;
+                div.querySelector('.prod-date').value = normalizeDateInput(productList[index].prodDate);
+                productList[index].prodDate = div.querySelector('.prod-date').value;
             }
             if (produk) {
                 updateProductFields(index);
@@ -470,7 +598,9 @@
             const prodDateInput = document.querySelectorAll('.prod-date')[index];
             const display = document.querySelectorAll('.batch-exp-display')[index];
             const produk = productList[index].produk;
-            const prodDate = prodDateInput.value;
+            const rawValue = prodDateInput.value || productList[index].prodDate;
+            const prodDate = normalizeDateInput(rawValue);
+            prodDateInput.value = prodDate;
             productList[index].prodDate = prodDate;
             if (!prodDate) {
                 display.value = '';
@@ -570,6 +700,29 @@
                 productData[produk].forEach(s => select.innerHTML += `<option value="${s}">${s}</option>`);
             }
             productList[index].ukuran = select.value;
+        }
+
+        function normalizeDateInput(value) {
+            if (!value) return '';
+            const text = value.toString().trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+
+            const date = new Date(text);
+            if (!isNaN(date)) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+
+            const parts = text.split(/[-\/]/);
+            if (parts.length === 3) {
+                const [a, b, c] = parts;
+                if (a.length === 2 && c.length === 4) {
+                    return `${c}-${b.padStart(2, '0')}-${a.padStart(2, '0')}`;
+                }
+            }
+            return '';
         }
 
         function formatDate(date) {
@@ -716,8 +869,25 @@
         document.getElementById('orderForm').onsubmit = async (e) => {
             e.preventDefault();
             const idx = document.getElementById('editIndex').value;
-            const resiInput = document.getElementById('resi').value.toUpperCase().trim();
+            const resiInput = normalizeResi(document.getElementById('resi').value);
+            const currentIndex = parseInt(idx, 10);
+            const errorMsg = document.getElementById('resiErrorMsg');
             
+            // STEP 1: Cek apakah ada pesan error duplikat yang ditampilkan
+            if (!errorMsg.classList.contains('d-none')) {
+                showToast('<i class="bi bi-exclamation-circle"></i> Resi duplikat! Ganti nomor resi Anda.', "danger");
+                console.warn('🚫 Submit blocked - error message displayed');
+                return;
+            }
+            
+            // STEP 2: Pastikan normalisasi resi juga dilakukan saat submit
+            if (resiInput && isDuplicateResi(resiInput, currentIndex)) {
+                setResiErrorState(true);
+                showToast(`<i class="bi bi-exclamation-circle"></i> Resi <b>${resiInput}</b> sudah ada!`, "danger");
+                console.warn('🚫 Submit blocked - Duplicate Resi after normalize:', resiInput);
+                return;
+            }
+
             // Collect products
             const products = productList.map(p => ({ produk: p.produk, ukuran: p.ukuran, kuantitas: p.qty, batch: p.batch || '', exp: p.exp || '', prodDate: p.prodDate || '' }));
             
@@ -731,19 +901,21 @@
                 return;
             }
             
-            // --- LOGIKA CEK RESI DUPLIKAT ---
+            // --- LOGIKA CEK RESI DUPLIKAT (IMPROVED) ---
             if (idx === "-1") {
                 // Saat tambah data baru
-                const isDuplicate = orders.some(o => o.resi === resiInput);
-                if (isDuplicate) {
-                    showToast(`Resi <b>${resiInput}</b> sudah ada di daftar!`, "danger");
+                if (isDuplicateResi(resiInput)) {
+                    setResiErrorState(true);
+                    showToast(`<i class="bi bi-exclamation-circle"></i> Resi <b>${resiInput}</b> sudah ada di daftar!`, "danger");
+                    console.warn('🚫 Save blocked - Duplicate Resi:', resiInput);
                     return; // Hentikan proses simpan
                 }
             } else {
                 // Saat edit data, cek apakah resi dipakai oleh index lain
-                const isDuplicate = orders.some((o, index) => o.resi === resiInput && index.toString() !== idx);
-                if (isDuplicate) {
-                    showToast(`Resi <b>${resiInput}</b> bentrok dengan pesanan lain!`, "danger");
+                if (isDuplicateResi(resiInput, parseInt(idx, 10))) {
+                    setResiErrorState(true);
+                    showToast(`<i class="bi bi-exclamation-circle"></i> Resi <b>${resiInput}</b> digunakan pesanan lain!`, "danger");
+                    console.warn('🚫 Save blocked - Duplicate Resi on edit:', resiInput);
                     return; // Hentikan proses simpan
                 }
             }
@@ -772,6 +944,7 @@
             
             e.target.reset();
             resetEkspedisiManual();
+            errorMsg.classList.add('d-none'); // Sembunyikan error message
             productList = [];
             renderProductContainer();
             addProduct(); // Reset to one product
@@ -783,8 +956,18 @@
             document.getElementById('nama').value = o.nama;
             document.getElementById('kota').value = o.kota || '';
             document.getElementById('resi').value = o.resi;
+            // Clear error message saat edit
+            document.getElementById('resiErrorMsg').classList.add('d-none');
+            document.getElementById('resi').classList.remove('is-invalid');
             setEkspedisiValue(o.ekspedisi);
-            productList = o.products.map(p => ({produk: p.produk, ukuran: p.ukuran, qty: p.kuantitas, batch: p.batch || '', exp: p.exp || '', prodDate: p.prodDate || ''}));
+            productList = o.products.map(p => ({
+                produk: p.produk,
+                ukuran: p.ukuran,
+                qty: p.kuantitas,
+                batch: p.batch || '',
+                exp: p.exp || '',
+                prodDate: normalizeDateInput(p.prodDate || '')
+            }));
             renderProductContainer();
             document.getElementById('editIndex').value = i;
             document.getElementById('btnBatal').classList.remove('d-none');
@@ -794,6 +977,9 @@
         document.getElementById('btnBatal').onclick = () => {
             document.getElementById('orderForm').reset();
             resetEkspedisiManual();
+            // Clear error message saat batal
+            document.getElementById('resiErrorMsg').classList.add('d-none');
+            document.getElementById('resi').classList.remove('is-invalid');
             document.getElementById('editIndex').value = "-1";
             document.getElementById('btnBatal').classList.add('d-none');
             productList = [];
@@ -911,7 +1097,32 @@
             return `${day}-${month}-${year}`;
         }
         // Render Awal
-        loadData();
+        (async () => {
+            // Disable submit button sampai data selesai dimuat
+            const submitBtn = document.querySelector('#orderForm button[type="submit"]');
+            const resiInput = document.getElementById('resi');
+            
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="bi bi-hourglass-end"></i> Memuat data...';
+            }
+            if (resiInput) resiInput.disabled = true;
+            
+            console.log('⏳ Loading initial data...');
+            
+            // Load initial data
+            await loadData();
+            
+            // Re-enable submit button & form
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-save"></i> Simpan Data';
+            }
+            if (resiInput) resiInput.disabled = false;
+            
+            console.log('✓ App ready - all data loaded, form unlocked');
+        })();
+        
         // Polling setiap 30 detik untuk sync dengan Google Sheets
         setInterval(loadData, 30000);
     </script>
