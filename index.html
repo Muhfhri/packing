@@ -54,6 +54,33 @@
         th.sortable.asc .sort-icon::after { content: '▲'; }
         th.sortable.desc .sort-icon::after { content: '▼'; }
         th.sortable.asc .sort-icon, th.sortable.desc .sort-icon { opacity: 1; color: #0d6efd; }
+        
+        /* Resi Click-to-Copy */
+        .resi-copyable {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            background: rgba(13, 110, 253, 0.05);
+            border: 1px solid rgba(13, 110, 253, 0.2);
+        }
+        .resi-copyable:hover {
+            background: rgba(13, 110, 253, 0.1);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(13, 110, 253, 0.15);
+        }
+        .resi-copyable.copied {
+            background: rgba(25, 135, 84, 0.2) !important;
+            border-color: rgba(25, 135, 84, 0.4) !important;
+            animation: pulse 0.6s ease-in-out;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
     </style>
 </head>
 <body>
@@ -119,7 +146,8 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label small fw-bold text-secondary">Kota Pembeli</label>
-                                <input type="text" id="kota" class="form-control" placeholder="Contoh: Bandung" required>
+                                <input type="text" id="kota" class="form-control" list="kotaSuggestions" placeholder="Ketik nama kota/kabupaten..." autocomplete="off" required>
+                                <datalist id="kotaSuggestions"></datalist>
                             </div>
                                             <div class="row mb-3">
                                 <div class="col-6">
@@ -229,6 +257,105 @@
             "Kunyit Asem": ["1000ml", "250ml"],
             "Beras Kencur": ["1000ml", "250ml"],
         };
+
+        // WILAYAH INDONESIA AUTOCOMPLETE
+        let allWilayah = []; // Semua wilayah (kota + kelurahan/desa)
+
+        async function loadWilayahData() {
+            try {
+                // Langsung load dari file JSON
+                const response = await fetch('indonesia-region.min.json');
+                const wilayahData = await response.json();
+                console.log('✓ Wilayah loaded from JSON file');
+                
+                // Build flat list of all wilayah
+                buildWilayahList(wilayahData);
+            } catch (e) {
+                console.warn('Gagal load wilayah data:', e);
+                // Fallback: gunakan data dasar
+                loadBasicWilayahList();
+            }
+        }
+        
+        function buildWilayahList(wilayahData) {
+            allWilayah = [];
+            
+            wilayahData.forEach(province => {
+                if (province.regencies) {
+                    province.regencies.forEach(regency => {
+                        // Nama kota/kabupaten
+                        const kotaName = regency.name.replace(/^KABUPATEN\s+/i, '').replace(/^KOTA\s+/i, '');
+                        
+                        // Tambah kota/kabupaten
+                        allWilayah.push({
+                            name: kotaName,
+                            type: 'Kota/Kabupaten',
+                            full: `${kotaName}, ${province.name}`
+                        });
+                        
+                        // Tambah kelurahan/desa jika ada
+                        if (regency.districts) {
+                            regency.districts.forEach(district => {
+                                if (district.villages) {
+                                    district.villages.forEach(village => {
+                                        // Format: "Nama Kelurahan, Nama Kecamatan, Kota, Provinsi"
+                                        allWilayah.push({
+                                            name: village.name,
+                                            type: 'Kelurahan/Desa',
+                                            full: `${village.name}, ${district.name}, ${kotaName}, ${province.name}`
+                                        });
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            
+            console.log('Total wilayah:', allWilayah.length);
+            // Update datalist
+            updateWilayahDatalist('');
+        }
+        
+        // Fallback list jika JSON gagal load
+        function loadBasicWilayahList() {
+            allWilayah = [
+                {name: 'Jakarta', type: 'Kota/Kabupaten', full: 'Jakarta, DKI Jakarta'},
+                {name: 'Bandung', type: 'Kota/Kabupaten', full: 'Bandung, Jawa Barat'},
+                {name: 'Surabaya', type: 'Kota/Kabupaten', full: 'Surabaya, Jawa Timur'},
+                {name: 'Medan', type: 'Kota/Kabupaten', full: 'Medan, Sumatera Utara'},
+                {name: 'Semarang', type: 'Kota/Kabupaten', full: 'Semarang, Jawa Tengah'},
+                {name: 'Makassar', type: 'Kota/Kabupaten', full: 'Makassar, Sulawesi Selatan'},
+                {name: 'Palembang', type: 'Kota/Kabupaten', full: 'Palembang, Sumatera Selatan'},
+                {name: 'Tangerang', type: 'Kota/Kabupaten', full: 'Tangerang, Banten'},
+                {name: 'Rawabadak Selatan', type: 'Kelurahan/Desa', full: 'Rawabadak Selatan, Koja, Jakarta Utara, DKI Jakarta'},
+                {name: 'Kelapa Gading Barat', type: 'Kelurahan/Desa', full: 'Kelapa Gading Barat, Kelapa Gading, Jakarta Utara, DKI Jakarta'},
+            ];
+            updateWilayahDatalist('');
+        }
+        
+        function updateWilayahDatalist(filter) {
+            const datalist = document.getElementById('kotaSuggestions');
+            if (!datalist) return;
+            
+            datalist.innerHTML = '';
+            
+            const filtered = filter 
+                ? allWilayah.filter(w => w.full.toLowerCase().includes(filter.toLowerCase()))
+                : allWilayah;
+            
+            // Ambil max 50 untuk performa
+            filtered.slice(0, 50).forEach(wilayah => {
+                const option = document.createElement('option');
+                option.value = wilayah.full;
+                datalist.appendChild(option);
+            });
+        }
+        
+        // Listener untuk autocomplete kota
+        document.getElementById('kota').addEventListener('input', function(e) {
+            updateWilayahDatalist(e.target.value);
+        });
 
         // GANTI URL INI DENGAN URL WEB APP ANDA DARI GOOGLE APPS SCRIPT
         const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxdlrwZIr3KfTfZd-gfiq475LENrIaezSAK7HwNYpNGUxqQ_bkMEy2FfeZx3Y1_Nj-Z/exec';
@@ -588,6 +715,40 @@
             select.value = 'JNE';
         }
 
+        // COPY RESI FUNCTION
+        window.copyResi = async function(resi, element) {
+            try {
+                await navigator.clipboard.writeText(resi);
+                // Visual feedback
+                element.classList.add('copied');
+                showToast(`Resi ${resi} disalin ke clipboard!`, 'success');
+                // Reset class setelah animasi
+                setTimeout(() => {
+                    element.classList.remove('copied');
+                }, 1200);
+            } catch (err) {
+                // Fallback untuk browser lama
+                const textArea = document.createElement('textarea');
+                textArea.value = resi;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    element.classList.add('copied');
+                    showToast(`Resi ${resi} disalin!`, 'success');
+                    setTimeout(() => element.classList.remove('copied'), 1200);
+                } catch (fallbackErr) {
+                    showToast('Gagal salin resi. Copy manual: ' + resi, 'danger');
+                } finally {
+                    document.body.removeChild(textArea);
+                }
+            }
+        };
+
         window.getEkspedisiValue = function() {
             const manualContainer = document.getElementById('ekspedisiManualContainer');
             const manualInput = document.getElementById('ekspedisiManual');
@@ -901,7 +1062,9 @@
                     <tr data-order="${originalIndex}" class="${rowBg}">
                         ${isFirst ? `<td class="ps-4" ${rowspan}>${globalNo++}</td>
                         <td ${rowspan}>
-                            <div class="font-monospace fw-bold text-dark mb-1" style="font-size: 0.9rem;">${o.resi}</div>
+                            <div class="font-monospace mb-1" style="font-size: 0.9rem;">
+                                <span class="resi-copyable font-monospace fw-bold text-dark" onclick="copyResi('${o.resi}', this)" title="Klik untuk salin">${o.resi}</span>
+                            </div>
                             <span class="badge ${expColor} badge-exp">${o.ekspedisi}</span>
                         </td>
                         <td class="fw-semibold text-secondary" ${rowspan}>${o.nama}</td>
@@ -1247,8 +1410,11 @@
             
             console.log('⏳ Loading initial data...');
             
-            // Load initial data
+            // Load data dari Google Sheets
             await loadData();
+            
+            // Load data wilayah Indonesia untuk autocomplete
+            await loadWilayahData();
             
             // Re-enable submit button & form
             if (submitBtn) {
