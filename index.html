@@ -41,6 +41,19 @@
         .toast-container .toast.show { transform: translateX(0); opacity: 1; }
         .toast-container .toast.hide-right { transform: translateX(120%); opacity: 0; }
         .toast-container .toast .toast-body { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+        
+        /* Sort Controls */
+        .sort-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .sort-controls .btn-group .btn { font-size: 0.75rem; padding: 0.25rem 0.5rem; }
+        .sort-indicator { font-size: 0.7rem; margin-left: 4px; }
+        
+        /* Table Header Sortable */
+        th.sortable { user-select: none; transition: background-color 0.2s; }
+        th.sortable:hover { background-color: #e9ecef !important; }
+        th.sortable .sort-icon { font-size: 0.7rem; margin-left: 4px; opacity: 0.5; }
+        th.sortable.asc .sort-icon::after { content: '▲'; }
+        th.sortable.desc .sort-icon::after { content: '▼'; }
+        th.sortable.asc .sort-icon, th.sortable.desc .sort-icon { opacity: 1; color: #0d6efd; }
     </style>
 </head>
 <body>
@@ -141,22 +154,22 @@
             <div class="col-lg-8">
                 <div class="card overflow-hidden">
                     <div class="card-header bg-light">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Cari berdasarkan Resi, Nama, Produk, dll..." oninput="filterTable()">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Cari berdasarkan Resi, Nama, Produk, dll... (Klik header kolom untuk urutkan)" oninput="filterTable()">
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light text-secondary small">
                                 <tr>
-                                    <th class="ps-4">No</th>
-                                    <th>Resi & Kurir</th>
-                                    <th>Pembeli</th>
-                                    <th>Kota</th>
-                                    <th>Produk</th>
+                                    <th class="ps-4 sortable" onclick="toggleSort('no')" style="cursor:pointer">No <span class="sort-icon" id="sortIcon-no"></span></th>
+                                    <th class="sortable" onclick="toggleSort('resi')" style="cursor:pointer">Resi <span class="sort-icon" id="sortIcon-resi"></span></th>
+                                    <th class="sortable" onclick="toggleSort('nama')" style="cursor:pointer">Pembeli <span class="sort-icon" id="sortIcon-nama"></span></th>
+                                    <th class="sortable" onclick="toggleSort('kota')" style="cursor:pointer">Kota <span class="sort-icon" id="sortIcon-kota"></span></th>
+                                    <th class="sortable" onclick="toggleSort('produk')" style="cursor:pointer">Produk <span class="sort-icon" id="sortIcon-produk"></span></th>
                                     <th>Ukuran</th>
                                     <th class="text-center">Qty</th>
                                     <th>Batch</th>
                                     <th>Exp</th>
-                                    <th>Waktu</th>
+                                    <th class="sortable" onclick="toggleSort('waktu')" style="cursor:pointer">Waktu <span class="sort-icon" id="sortIcon-waktu"></span></th>
                                     <th class="text-center pe-4">Aksi</th>
                                 </tr>
                             </thead>
@@ -225,6 +238,100 @@
         let html5QrCode = null;
         let isLoading = false;
         let isDataLoaded = false; // Flag untuk tracking apakah initial load selesai
+        
+        // Sort Configuration - klik header kolom untuk urutkan
+        let currentSort = JSON.parse(localStorage.getItem('sortPreference')) || { field: 'waktu', direction: 'desc' };
+        
+        window.toggleSort = function(field) {
+            if (currentSort.field === field) {
+                // Toggle direction jika field sama
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                // Default ke descending untuk field baru (kecuali alfabet)
+                currentSort = { field: field, direction: 'desc' };
+                if (['nama', 'kota', 'produk'].includes(field)) {
+                    currentSort.direction = 'asc'; // A-Z default untuk teks
+                }
+            }
+            localStorage.setItem('sortPreference', JSON.stringify(currentSort));
+            updateHeaderSortIcons();
+            render();
+        };
+        
+        function updateHeaderSortIcons() {
+            // Reset semua header
+            document.querySelectorAll('th.sortable').forEach(th => {
+                th.classList.remove('asc', 'desc');
+            });
+            // Aktifkan yang aktif
+            const activeTh = document.querySelector(`th.sortable[onclick*="${currentSort.field}"]`);
+            if (activeTh) {
+                activeTh.classList.add(currentSort.direction);
+            }
+        }
+        
+        // Helper untuk parse waktu - format: 17/4/2026, 15.53.35
+        function parseWaktu(waktuStr) {
+            if (!waktuStr) return 0;
+            
+            // Format: 17/4/2026, 15.53.35 ATAU 17/4/2026 15.53.35
+            const match = waktuStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[, ]+(\d{1,2})\.(\d{2})\.(\d{2})$/);
+            if (match) {
+                const [, day, month, year, hour, minute, second] = match;
+                return new Date(year, month - 1, day, hour, minute, second).getTime();
+            }
+            
+            // Coba format lain: 17/4/2026 15:53:35
+            const match2 = waktuStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+            if (match2) {
+                const [, day, month, year, hour, minute, second] = match2;
+                return new Date(year, month - 1, day, hour, minute, second).getTime();
+            }
+            
+            // Fallback ke Date native
+            const date = new Date(waktuStr);
+            return isNaN(date.getTime()) ? 0 : date.getTime();
+        }
+        
+        function getSortedOrders() {
+            const sorted = [...orders];
+            const { field, direction } = currentSort;
+            
+            sorted.sort((a, b) => {
+                let valA, valB;
+                
+                if (field === 'no') {
+                    // Untuk No, tetap urutan input (index array + 1)
+                    valA = orders.indexOf(a) + 1;
+                    valB = orders.indexOf(b) + 1;
+                } else if (field === 'waktu') {
+                    // Gunakan timestamp (angka) untuk perbandingan
+                    valA = parseWaktu(a.createdAt);
+                    valB = parseWaktu(b.createdAt);
+                } else if (field === 'nama') {
+                    valA = (a.nama || '').toLowerCase();
+                    valB = (b.nama || '').toLowerCase();
+                } else if (field === 'kota') {
+                    valA = (a.kota || '').toLowerCase();
+                    valB = (b.kota || '').toLowerCase();
+                } else if (field === 'resi') {
+                    valA = (a.resi || '').toLowerCase();
+                    valB = (b.resi || '').toLowerCase();
+                } else if (field === 'produk') {
+                    // Ambil produk pertama dari array
+                    valA = (a.products && a.products[0] ? a.products[0].produk : '').toLowerCase();
+                    valB = (b.products && b.products[0] ? b.products[0].produk : '').toLowerCase();
+                }
+                
+                if (direction === 'asc') {
+                    return valA > valB ? 1 : valA < valB ? -1 : 0;
+                } else {
+                    return valA < valB ? 1 : valA > valB ? -1 : 0;
+                }
+            });
+            
+            return sorted;
+        }
 
         // FUNGSI GOOGLE SHEETS - dengan localStorage backup
         async function loadData() {
@@ -434,10 +541,12 @@
             const manualContainer = document.getElementById('ekspedisiManualContainer');
             const exp = document.getElementById('ekspedisi');
             if (manualContainer && manualContainer.classList.contains('d-none')) {
-                if (val.startsWith("1100")) exp.value = "Anter Aja";
-                else if (val.startsWith("SPXID")) exp.value = "SPX ID";
+                if (val.startsWith("1100") || val.startsWith("TSA")) exp.value = "Anter Aja";
+                else if (val.startsWith("SPXID") || val.startsWith("2604")) exp.value = "SPX ID";
                 else if (val.startsWith("JX") || val.startsWith("JP")) exp.value = "JNT";
-                else if (/^\d{10,}$/.test(val)) exp.value = "JNE";
+                else if (val.startsWith("CM")) exp.value = "JNT";
+                else if (val.startsWith("58")) exp.value = "Grab";
+                
             }
         };
 
@@ -677,6 +786,19 @@
                 const visible = ordersVisibility[orderIndex];
                 row.style.display = visible ? '' : 'none';
             });
+            
+            // Update counter di rekap
+            updateStatCounter();
+        }
+        
+        function updateStatCounter() {
+            const visibleRows = document.querySelectorAll('#tableBody tr:not([style*="display: none"])[data-order]');
+            const uniqueOrders = new Set();
+            visibleRows.forEach(row => {
+                const orderIndex = row.getAttribute('data-order');
+                if (orderIndex) uniqueOrders.add(orderIndex);
+            });
+            document.getElementById('statTotal').textContent = uniqueOrders.size;
         }
 
         window.removeProduct = function(index) {
@@ -739,13 +861,24 @@
             
             const summary = {}; 
             let globalNo = 1; 
+            
+            // Gunakan data yang sudah diurutkan
+            const sortedOrders = getSortedOrders();
+            
+            // Buat mapping dari index asli ke posisi di array yang sudah diurutkan
+            const indexMap = {};
+            sortedOrders.forEach((o, newIndex) => {
+                const originalIndex = orders.indexOf(o);
+                indexMap[originalIndex] = newIndex;
+            });
 
-            orders.forEach((o, orderIndex) => {
+            sortedOrders.forEach((o, orderIndex) => {
                 o.products.forEach((p, productIndex) => {
                     const isFirst = productIndex === 0;
                     const rowspan = isFirst ? `rowspan="${o.products.length}"` : '';
-                    const aksi = isFirst ? `<button onclick="edit(${orderIndex})" class="btn btn-sm btn-outline-warning me-1" title="Edit"><i class="bi bi-pencil-fill"></i></button>
-                        <button onclick="hapus(${orderIndex})" class="btn btn-sm btn-outline-danger" title="Hapus"><i class="bi bi-trash-fill"></i></button>` : '';
+                    const originalIndex = orders.indexOf(o);
+                    const aksi = isFirst ? `<button onclick="edit(${originalIndex})" class="btn btn-sm btn-outline-warning me-1" title="Edit"><i class="bi bi-pencil-fill"></i></button>
+                        <button onclick="hapus(${originalIndex})" class="btn btn-sm btn-outline-danger" title="Hapus"><i class="bi bi-trash-fill"></i></button>` : '';
 
                     // Logika Summary Group
                     if(!summary[p.produk]) summary[p.produk] = {};
@@ -765,7 +898,7 @@
                     const rowBg = isEdited ? "bg-warning bg-opacity-25" : "";
 
                     tbody.innerHTML += `
-                    <tr data-order="${orderIndex}" class="${rowBg}">
+                    <tr data-order="${originalIndex}" class="${rowBg}">
                         ${isFirst ? `<td class="ps-4" ${rowspan}>${globalNo++}</td>
                         <td ${rowspan}>
                             <div class="font-monospace fw-bold text-dark mb-1" style="font-size: 0.9rem;">${o.resi}</div>
@@ -786,9 +919,9 @@
                 });
             });
 
-            document.getElementById('statTotal').textContent = orders.length;
+            document.getElementById('statTotal').textContent = sortedOrders.length;
             const area = document.getElementById('rekapProdukArea');
-            if (orders.length === 0) {
+            if (sortedOrders.length === 0) {
                 area.innerHTML = '<p class="text-center text-muted small mt-4">Belum ada pesanan masuk hari ini.</p>';
                 return;
             }
@@ -1008,8 +1141,12 @@
         // IMPORT / EKSPORT CSV
         function downloadCSV() {
             if(orders.length === 0) return showToast("Tidak ada data untuk diunduh!");
+            
+            // Gunakan data yang sudah diurutkan sesuai preferensi
+            const sortedOrders = getSortedOrders();
+            
             let csv = "Nama,Kota,Resi,Ekspedisi,Produk,Ukuran,Qty,Batch,Exp,ProdDate,CreatedAt,UpdatedAt\n";
-            orders.forEach(o => {
+            sortedOrders.forEach(o => {
                 o.products.forEach(p => csv += `"${o.nama}","${o.kota || ''}","${o.resi}","${o.ekspedisi}","${p.produk}","${p.ukuran}","${p.kuantitas}","${p.batch || ''}","${p.exp || ''}","${p.prodDate || ''}","${o.createdAt || ''}","${o.updatedAt || ''}"\n`);
             });
             const blob = new Blob([csv], { type: 'text/csv' });
@@ -1121,6 +1258,9 @@
             if (resiInput) resiInput.disabled = false;
             
             console.log('✓ App ready - all data loaded, form unlocked');
+            
+            // Update ikon sort di header sesuai preferensi
+            updateHeaderSortIcons();
         })();
         
         // Polling setiap 30 detik untuk sync dengan Google Sheets
