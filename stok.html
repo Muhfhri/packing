@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelola Stok - PackingEasy</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #0d6efd;
+            --success-color: #198754;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --light-bg: #f8f9fa;
+            --card-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        }
+        
+        body { 
+            background-color: var(--light-bg); 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-image: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            min-height: 100vh;
+        }
+        
+        .card { 
+            border: none; 
+            border-radius: 20px; 
+            box-shadow: var(--card-shadow); 
+            margin-bottom: 1.5rem; 
+            overflow: hidden;
+        }
+        
+        .card-header-custom { 
+            background: linear-gradient(135deg, var(--success-color) 0%, #146c43 100%); 
+            color: white; 
+            border-radius: 20px 20px 0 0 !important; 
+            padding: 1rem 1.5rem;
+        }
+        
+        .page-header {
+            background: linear-gradient(135deg, #fff 0%, #f0f4f8 100%);
+            border-radius: 20px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--card-shadow);
+        }
+        
+        .page-header h2 {
+            background: linear-gradient(135deg, var(--success-color) 0%, #20c997 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Stock Card - Lebih menarik */
+        .stock-card { 
+            background: #fff; 
+            border: 1px solid #e9ecef; 
+            border-left: 5px solid var(--success-color); 
+            padding: 20px; 
+            border-radius: 16px; 
+            margin-bottom: 16px; 
+            transition: all 0.3s ease; 
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stock-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100px;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(25, 135, 84, 0.03));
+            transition: all 0.3s ease;
+        }
+        
+        .stock-card:hover { 
+            transform: translateY(-4px); 
+            box-shadow: 0 12px 24px rgba(0,0,0,0.1); 
+            border-left-color: #20c997;
+        }
+        
+        .stock-card:hover::before {
+            background: linear-gradient(90deg, transparent, rgba(25, 135, 84, 0.08));
+        }
+        
+        .stock-info { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        
+        .product-name { 
+            font-weight: 800; 
+            color: #212529; 
+            font-size: 1.2rem;
+            line-height: 1.3;
+        }
+        
+        .product-size {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+        
+        .stock-numbers {
+            text-align: right;
+        }
+        
+        .stock-badge { 
+            font-size: 1.8rem; 
+            font-weight: 800; 
+            line-height: 1;
+        }
+        
+        .stock-badge.remaining { 
+            color: var(--danger-color); 
+        }
+        
+        .stock-badge.total {
+            color: var(--success-color);
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        
+        .stock-label {
+            font-size: 0.75rem;
+            color: #adb5bd;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Batch tags - lebih menarik */
+        .batch-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .batch-tag { 
+            display: inline-flex;
+            align-items: center;
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%); 
+            padding: 6px 14px; 
+            border-radius: 25px; 
+            font-size: 0.85rem; 
+            font-weight: 600;
+            color: #495057;
+            transition: all 0.2s ease;
+        }
+        
+        .batch-tag:hover {
+            background: linear-gradient(135deg, #dee2e6 0%, #ced4da 100%);
+            transform: scale(1.02);
+        }
+        
+        .batch-tag.no-batch { 
+            background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); 
+            color: #856404; 
+        }
+        
+        .batch-tag i {
+            margin-right: 6px;
+            font-size: 0.8rem;
+        }
+        
+        /* Action buttons */
+        .stock-actions { 
+            display: flex; 
+            gap: 10px; 
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px dashed #e9ecef;
+        }
+        
+        .stock-actions .btn {
+            flex: 1;
+            border-radius: 10px;
+            font-weight: 600;
+            padding: 8px 16px;
+            transition: all 0.2s ease;
+        }
+        
+        .stock-actions .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* Sales Summary Card */
+        .sales-card {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            border-radius: 20px;
+            padding: 24px;
+            color: white;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 8px 32px rgba(13, 110, 253, 0.3);
+        }
+        
+        .sales-card h5 {
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .sales-item {
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        
+        .sales-item:hover {
+            background: rgba(255,255,255,0.25);
+            transform: translateY(-3px);
+        }
+        
+        .sales-item .product-name {
+            color: white;
+            font-size: 1rem;
+        }
+        
+        .sales-item .product-size {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.85rem;
+        }
+        
+        .sales-item .qty-badge {
+            background: white;
+            color: #0d6efd;
+            font-weight: 700;
+            font-size: 1.1rem;
+            padding: 8px 20px;
+            border-radius: 25px;
+            display: inline-block;
+            margin-top: 8px;
+        }
+        
+        /* Sales item clickable */
+        .sales-item {
+            cursor: pointer;
+        }
+        
+        /* Summary Row */
+        .summary-row { 
+            background: linear-gradient(135deg, var(--success-color) 0%, #20c997 100%); 
+            color: white; 
+            padding: 20px 24px; 
+            border-radius: 16px; 
+            margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(25, 135, 84, 0.3);
+        }
+        
+        .summary-row h5 {
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+        
+        .total-remaining-box {
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 12px 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .total-remaining-box .number {
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+        
+        .total-remaining-box .label {
+            font-size: 0.75rem;
+            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* Table styling */
+        .table { 
+            margin: 0; 
+        }
+        
+        .table > :not(caption) > * > * { 
+            padding: 1rem 0.75rem; 
+            vertical-align: middle; 
+        }
+        
+        .table thead th {
+            background: #f8f9fa;
+            font-weight: 700;
+            color: #495057;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .table tbody tr {
+            transition: all 0.2s ease;
+        }
+        
+        .table tbody tr:hover {
+            background: #f8fff9;
+        }
+        
+        .table tbody tr.no-batch-row {
+            background: #fffbf0;
+        }
+        
+        .table tbody tr.no-batch-row:hover {
+            background: #fff8e6;
+        }
+        
+        /* Toast */
+        .toast-container { 
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            z-index: 1060; 
+            width: auto; 
+            max-width: 360px; 
+        }
+        
+        .toast-container .toast { 
+            transform: translateX(120%); 
+            opacity: 0; 
+            transition: transform 0.35s ease, opacity 0.35s ease; 
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .toast-container .toast.show { 
+            transform: translateX(0); 
+            opacity: 1; 
+        }
+        
+        /* Modal styling */
+        .modal-content {
+            border-radius: 20px;
+            overflow: hidden;
+        }
+        
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+        }
+        
+        .modal-body {
+            padding: 1.5rem;
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-control, .form-select {
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            border: 2px solid #e9ecef;
+            transition: all 0.2s ease;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--success-color);
+            box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.1);
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            color: #dee2e6;
+            margin-bottom: 16px;
+        }
+        
+        .empty-state p {
+            color: #6c757d;
+            font-size: 1rem;
+        }
+        
+        /* Loading spinner */
+        .loading-spinner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+        }
+        
+        .loading-spinner .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .stock-card {
+                padding: 16px;
+            }
+            
+            .stock-info {
+                flex-direction: column;
+                gap: 12px;
+            }
+            
+            .stock-numbers {
+                text-align: left;
+                display: flex;
+                gap: 16px;
+                align-items: baseline;
+            }
+            
+            .sales-card {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="toast-container" id="toastArea"></div>
+
+    <div class="container py-4">
+        <!-- Header -->
+        <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <a href="index.html" class="btn btn-outline-secondary mb-2">
+                    <i class="bi bi-arrow-left"></i> Kembali
+                </a>
+                <h2 class="fw-bold m-0">
+                    <i class="bi bi-box-seam-fill"></i> Kelola Stok
+                </h2>
+                <p class="text-muted mb-0 mt-1">Kelola inventori produk Anda</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button onclick="loadAllData()" class="btn btn-outline-primary fw-bold px-3 py-2" style="border-radius: 12px;">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Refresh
+                </button>
+                <button onclick="bukaModalTambah()" class="btn btn-success fw-bold px-4 py-2" style="border-radius: 12px;">
+                    <i class="bi bi-plus-circle me-2"></i>Tambah Stok
+                </button>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Ringkasan Penjualan Hari Ini -->
+            <div class="col-12">
+                <div class="sales-card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="mb-1"><i class="bi bi-cart-check me-2"></i>Penjualan Hari Ini</h5>
+                            <small class="opacity-75" id="todayDate"></small>
+                        </div>
+                        <div class="text-end">
+                            <div class="opacity-75 small">Total Invoice</div>
+                            <div class="fs-4 fw-bold" id="todayTotalSold">0</div>
+                        </div>
+                    </div>
+                    <div id="todaySalesList">
+                        <div class="text-center opacity-75 py-3">Memuat data...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Detail Penjualan Hari Ini -->
+            <div class="modal fade" id="todaySalesDetailModal" tabindex="-1">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content border-0 shadow-lg">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title fw-bold" id="todaySalesDetailTitle"><i class="bi bi-cart-check"></i> Detail Penjualan</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover m-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-3">No</th>
+                                            <th>Pembeli</th>
+                                            <th>Resi</th>
+                                            <th>Produk</th>
+                                            <th>Ukuran</th>
+                                            <th class="text-center">Qty</th>
+                                            <th>Kurir</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="todaySalesDetailBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light">
+                            <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Tutup</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stok Tersedia (Kiri) -->
+            <div class="col-lg-5">
+                <div class="card">
+                    <div class="card-header-custom d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold m-0"><i class="bi bi-clipboard-data me-2"></i>Stok Tersedia</h6>
+                        <span class="badge bg-light text-success fw-bold" id="stockCount">0</span>
+                    </div>
+                    <!-- Filter Batch -->
+                    <div class="px-3 pt-3 pb-0">
+                        <select id="batchFilter" class="form-select form-select-sm" onchange="filterByBatch()">
+                            <option value="">Semua Batch</option>
+                            <option value="1">Madu (Batch 1)</option>
+                            <option value="2">Madu Sarang (Batch 2)</option>
+                            <option value="4">Lemon (Batch 4)</option>
+                            <option value="5">VCO (Batch 5)</option>
+                            <option value="6">Garlic (Batch 6)</option>
+                            <option value="7">Kunyit Asem (Batch 7)</option>
+                            <option value="8">Beras Kencur (Batch 8)</option>
+                            <option value="no-batch">Tanpa Batch</option>
+                        </select>
+                    </div>
+                    <div class="card-body p-3" style="max-height: 600px; overflow-y: auto;">
+                        <div id="stockList">
+                            <div class="empty-state">
+                                <i class="bi bi-box-seam"></i>
+                                <p>Belum ada stok.<br>Klik "Tambah Stok" untuk memulai.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ringkasan Stok (Kanan) -->
+            <div class="col-lg-7">
+                <div class="summary-row">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1"><i class="bi bi-graph-down-arrow me-2"></i>Ringkasan Stok</h5>
+                            <small class="opacity-75">Sisa stok = Stok awal - Terjual hari ini</small>
+                        </div>
+                        <div class="total-remaining-box">
+                            <div class="number" id="totalRemaining">0</div>
+                            <div class="label">Sisa Total</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">Produk</th>
+                                        <th>Ukuran</th>
+                                        <th>Batch</th>
+                                        <th class="text-center">Stok Awal</th>
+                                        <th class="text-center">Terjual</th>
+                                        <th class="text-center pe-4">Sisa</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stockTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Tambah/Edit Stok -->
+    <div class="modal fade" id="stockModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold" id="stockModalTitle"><i class="bi bi-plus-circle"></i> Tambah Stok</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="stockForm">
+                        <input type="hidden" id="editStockIndex" value="-1">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Produk</label>
+                            <select id="stockProduk" class="form-select" required onchange="updateStockSizes(); toggleBatchFields()">
+                                <option value="">-- Pilih Produk --</option>
+                                <option value="Madu Sarang">Madu Sarang</option>
+                                <option value="Madu">Madu</option>
+                                <option value="Lemon">Lemon</option>
+                                <option value="VCO">VCO</option>
+                                <option value="Garlic">Garlic</option>
+                                <option value="Kunyit Asem">Kunyit Asem</option>
+                                <option value="Beras Kencur">Beras Kencur</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Ukuran</label>
+                            <select id="stockUkuran" class="form-select" required>
+                                <option value="">-- Pilih Ukuran --</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Batch & Exp - Auto Generate -->
+                        <div id="batchExpContainer" class="border rounded p-3 mb-3 bg-light" style="display: none;">
+                            <div class="row">
+                                <div class="col-6">
+                                    <label class="form-label fw-bold">Tanggal Produksi</label>
+                                    <input type="date" id="stockProdDate" class="form-control" onchange="calculateStockBatchExp()">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold">Batch & Exp</label>
+                                    <input type="text" id="stockBatchExp" class="form-control" readonly placeholder="Akan otomatis terisi">
+                                </div>
+                            </div>
+                            <small class="text-muted mt-2 d-block">Batch dan Exp akan otomatis dihitung berdasarkan tanggal produksi</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Jumlah Stok</label>
+                            <input type="number" id="stockJumlah" class="form-control" min="1" value="1" required>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success flex-grow-1 fw-bold"><i class="bi bi-save"></i> Simpan</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const productData = {
+            "Madu Sarang": ["700gr"],
+            "Madu": ["700gr", "300gr"],
+            "Lemon": ["500ml", "250ml"],
+            "VCO": ["500ml", "250ml"],
+            "Garlic": ["500ml", "250ml"],
+            "Kunyit Asem": ["1000ml", "250ml"],
+            "Beras Kencur": ["1000ml", "250ml"],
+        };
+
+        // GOOGLE SHEETS URL - sama dengan index.html
+        const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxdlrwZIr3KfTfZd-gfiq475LENrIaezSAK7HwNYpNGUxqQ_bkMEy2FfeZx3Y1_Nj-Z/exec';
+
+        let stockData = [];
+        let orders = [];
+        let isLoading = false;
+
+        // Load data
+        async function loadAllData() {
+            isLoading = true;
+            document.getElementById('stockList').innerHTML = `
+                <div class="loading-spinner">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <p class="text-muted">Memuat data dari server...</p>
+                </div>
+            `;
+            document.getElementById('todaySalesList').innerHTML = `
+                <div class="text-center opacity-75 py-3">
+                    <div class="spinner-border spinner-border-sm me-2"></div>Memuat...
+                </div>
+            `;
+            
+            try {
+                // Load orders dari Google Sheets
+                const response = await fetch(GOOGLE_SHEETS_URL);
+                const result = await response.json();
+                if (result.success) {
+                    orders = result.data || [];
+                    console.log('✓ Data loaded from Google Sheets:', orders.length, 'orders');
+                } else {
+                    const backup = localStorage.getItem('orders');
+                    orders = backup ? JSON.parse(backup) : [];
+                    console.log('⚠️ Using backup from localStorage:', orders.length, 'orders');
+                }
+            } catch (e) {
+                const backup = localStorage.getItem('orders');
+                orders = backup ? JSON.parse(backup) : [];
+                console.log('⚠️ Using backup from localStorage:', orders.length, 'orders');
+            }
+
+            // Load stock dari localStorage
+            const stockBackup = localStorage.getItem('stockData');
+            stockData = stockBackup ? JSON.parse(stockBackup) : [];
+
+            // Tampilkan ringkasan penjualan hari ini
+            const todaySales = getTodaySalesSummary();
+            console.log('📊 Penjualan hari ini:', todaySales);
+
+            renderTodaySales(todaySales);
+            renderStockList();
+            renderStockTable();
+            isLoading = false;
+        }
+
+        // Render ringkasan penjualan hari ini
+        function renderTodaySales(summary) {
+            const container = document.getElementById('todaySalesList');
+            const today = new Date();
+            const todayStr = today.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            
+            // Get today's orders with details
+            const todayOrders = [];
+            orders.forEach(o => {
+                if (!o.createdAt) return;
+                const dateMatch = o.createdAt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                if (!dateMatch) return;
+                const orderDate = `${dateMatch[1].padStart(2,'0')}/${dateMatch[2].padStart(2,'0')}/${dateMatch[3]}`;
+                if (orderDate === todayStr) {
+                    todayOrders.push(o);
+                }
+            });
+            
+            // Total invoice = jumlah pesanan unik
+            const totalInvoice = todayOrders.length;
+            document.getElementById('todayTotalSold').textContent = totalInvoice;
+            
+            if (todayOrders.length === 0) {
+                container.innerHTML = '<div class="text-center opacity-75 py-3"><i class="bi bi-bag-x me-2"></i>Belum ada penjualan hari ini</div>';
+                return;
+            }
+
+            // Build summary by produk+ukuran
+            const productSummary = {};
+            todayOrders.forEach(o => {
+                o.products.forEach(p => {
+                    const key = `${p.produk}||${p.ukuran}`;
+                    if (!productSummary[key]) {
+                        productSummary[key] = { produk: p.produk, ukuran: p.ukuran, count: 0, orders: [] };
+                    }
+                    productSummary[key].count += parseInt(p.kuantitas || 0);
+                    productSummary[key].orders.push({ ...p, buyer: o.nama, resi: o.resi, ekspedisi: o.ekspedisi });
+                });
+            });
+
+            // Render summary cards (clickable)
+            container.innerHTML = '<div class="row g-3">';
+            
+            for (const key in productSummary) {
+                const s = productSummary[key];
+                container.innerHTML += `
+                    <div class="col-md-4 col-sm-6">
+                        <div class="sales-item" onclick="showTodaySalesDetail('${key}')" style="cursor: pointer;" title="Klik untuk lihat detail pembeli">
+                            <div class="product-name">${s.produk}</div>
+                            <div class="product-size">${s.ukuran}</div>
+                            <div class="qty-badge">${s.count} terjual</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML += '</div>';
+            
+            // Store data for detail view
+            window.todaySalesData = productSummary;
+        }
+
+        // Show detail modal for product
+        window.showTodaySalesDetail = function(key) {
+            const data = window.todaySalesData[key];
+            if (!data) return;
+            
+            const modalBody = document.getElementById('todaySalesDetailBody');
+            modalBody.innerHTML = '';
+            
+            data.orders.forEach((o, idx) => {
+                modalBody.innerHTML += `
+                    <tr>
+                        <td class="ps-3">${idx + 1}</td>
+                        <td class="fw-bold text-primary">${o.buyer}</td>
+                        <td class="font-monospace">${o.resi}</td>
+                        <td>${o.produk}</td>
+                        <td><span class="badge bg-light text-dark border">${o.ukuran}</span></td>
+                        <td class="text-center"><span class="badge bg-success">${o.kuantitas}</span></td>
+                        <td><span class="badge bg-secondary">${o.ekspedisi}</span></td>
+                    </tr>
+                `;
+            });
+            
+            document.getElementById('todaySalesDetailTitle').innerHTML = `<i class="bi bi-cart-check"></i> Detail Penjualan: ${data.produk} (${data.ukuran})`;
+            new bootstrap.Modal(document.getElementById('todaySalesDetailModal')).show();
+        };
+
+        // Get ringkasan penjualan hari ini (seperti di index.html)
+        function getTodaySalesSummary() {
+            const summary = {};
+            const today = new Date();
+            const todayStr = today.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            
+            orders.forEach(o => {
+                if (!o.createdAt) return;
+                
+                // Parse tanggal dari createdAt (format: "17/4/2026, 15.53.35" atau "17/4/2026 15.53.35")
+                const dateMatch = o.createdAt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                if (!dateMatch) return;
+                
+                const orderDate = `${dateMatch[1].padStart(2,'0')}/${dateMatch[2].padStart(2,'0')}/${dateMatch[3]}`;
+                
+                // Cek apakah hari ini
+                if (orderDate === todayStr) {
+                    o.products.forEach(p => {
+                        const key = `${p.produk}||${p.ukuran}`;
+                        if (!summary[key]) {
+                            summary[key] = { produk: p.produk, ukuran: p.ukuran, count: 0, items: [] };
+                        }
+                        summary[key].count += parseInt(p.kuantitas || 0);
+                        summary[key].items.push(p);
+                    });
+                }
+            });
+            
+            return summary;
+        }
+
+        // Simpan stock ke localStorage
+        function saveStock() {
+            localStorage.setItem('stockData', JSON.stringify(stockData));
+            renderStockList();
+            renderStockTable();
+        }
+
+        // Render daftar stok di kiri - Tampilkan per produk+ukuran+batch (tidak digabungkan)
+        function renderStockList() {
+            const container = document.getElementById('stockList');
+            
+            if (stockData.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-box-seam"></i>
+                        <p>Belum ada stok.<br>Klik "Tambah Stok" untuk memulai.</p>
+                    </div>
+                `;
+                document.getElementById('stockCount').textContent = '0';
+                return;
+            }
+
+            // Buat array dengan index asli dari stockData
+            const stockWithIndex = stockData.map((s, originalIndex) => ({ ...s, originalIndex }));
+            
+            // Urutkan: nomor batch dulu (1,2,4,5,6,7,8), lalu tanggal batch (terlama dulu)
+            const batchOrder = { '1': 1, '2': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7 };
+            const parseBatchDate = (batch) => {
+                if (!batch) return null;
+                // Format: "6.14-04-2026" atau "B001-17/4/2026"
+                // Split dulu dengan "-"
+                const parts = batch.split('-');
+                if (parts.length >= 2) {
+                    // parts[0] = "6.14" atau "B001", parts[1] = "04-2026" atau "17/4/2026"
+                    const firstPart = parts[0];
+                    const secondPart = parts[1];
+                    
+                    // Cek format baru: 6.14-04-2026
+                    if (firstPart.includes('.')) {
+                        const numDate = firstPart.split('.');
+                        if (numDate.length >= 2) {
+                            const day = parseInt(numDate[1]);
+                            const dateStr = secondPart + '-' + parts[2]; // "04-2026"
+                            return new Date(dateStr); // akan parse "04-2026" sebagai April 2026
+                        }
+                    }
+                    // Cek format lama: B001-17/4/2026
+                    const d = secondPart.split('/');
+                    if (d.length === 3) {
+                        return new Date(d[2], d[1] - 1, d[0]);
+                    }
+                }
+                return null;
+            };
+            stockWithIndex.sort((a, b) => {
+                const getBatchNum = (batch) => {
+                    if (!batch) return 999;
+                    const firstChar = batch.charAt(0);
+                    return batchOrder[firstChar] || 8;
+                };
+                const aNum = getBatchNum(a.batch);
+                const bNum = getBatchNum(b.batch);
+                if (aNum !== bNum) return aNum - bNum;
+                // Jika batch sama, urutkan berdasarkan tanggal (terlama dulu)
+                const aDate = parseBatchDate(a.batch);
+                const bDate = parseBatchDate(b.batch);
+                if (aDate && bDate) return aDate - bDate;
+                if (aDate) return -1;
+                if (bDate) return 1;
+                return a.ukuran.localeCompare(b.ukuran);
+            });
+
+            document.getElementById('stockCount').textContent = stockWithIndex.length;
+            
+            container.innerHTML = '';
+            
+            stockWithIndex.forEach((s) => {
+                // Hitung terjual HANYA untuk batch yang cocok
+                const terjual = hitungTerjual(s.produk, s.ukuran, s.batch);
+                const sisa = s.jumlah - terjual;
+                
+                // Group header (sekarang termasuk batch agar bedanya muncul)
+                const idx = stockWithIndex.indexOf(s);
+                const prev = idx > 0 ? stockWithIndex[idx - 1] : null;
+                const isNewGroup = !prev || (prev.produk !== s.produk || prev.ukuran !== s.ukuran || prev.batch !== s.batch);
+                
+                const div = document.createElement('div');
+                div.className = 'stock-card';
+                div.innerHTML = `
+                    ${isNewGroup ? `<div class="group-header mb-2"><span class="fw-bold text-dark">${s.produk}</span> <span class="text-muted">${s.ukuran}</span></div>` : ''}
+                    <div class="stock-info">
+                        <div>
+                            <div class="batch-info">
+                                <i class="bi ${s.batch ? 'bi-upc' : 'bi-dash-circle'} me-1"></i>
+                                <span class="${s.batch ? '' : 'text-muted'}">${s.batch || 'Tanpa Batch'}</span>
+                            </div>
+                            ${s.exp ? `<div class="exp-info small text-muted mt-1"><i class="bi bi-calendar me-1"></i>Exp: ${s.exp}</div>` : ''}
+                        </div>
+                        <div class="stock-numbers">
+                            <div class="stock-badge ${sisa > 0 ? 'remaining' : 'text-danger'}">${sisa}</div>
+                            <div class="stock-label">sisa</div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="stock-badge total">${s.jumlah}</span>
+                        <span class="text-muted small">stok awal</span>
+                    </div>
+                    <div class="stock-actions">
+                        <button onclick="editStock(${s.originalIndex})" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-pencil me-1"></i> Edit
+                        </button>
+                        <button onclick="hapusStock(${s.originalIndex})" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-trash me-1"></i> Hapus
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function getBatchTags(items) {
+            const batches = items.map(i => i.batch || 'Tanpa Batch');
+            const unique = [...new Set(batches)];
+            
+            return unique.map(batch => {
+                const isNoBatch = batch === 'Tanpa Batch';
+                return `<span class="batch-tag ${isNoBatch ? 'no-batch' : ''}">
+                    <i class="bi ${isNoBatch ? 'bi-dash-circle' : 'bi-upc'}"></i>${batch}
+                </span>`;
+            }).join('');
+        }
+
+        // Filter stok berdasarkan nomor batch
+        function filterByBatch() {
+            const batchFilter = document.getElementById('batchFilter').value;
+            const container = document.getElementById('stockList');
+            
+            if (stockData.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-box-seam"></i>
+                        <p>Belum ada stok.<br>Klik "Tambah Stok" untuk memulai.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Filter data berdasarkan batch
+            let filteredData = stockData.map((s, originalIndex) => ({ ...s, originalIndex }));
+            
+            if (batchFilter) {
+                if (batchFilter === 'no-batch') {
+                    // Filter yang tanpa batch
+                    filteredData = filteredData.filter(s => !s.batch);
+                } else {
+                    // Filter yang batch-nya dimulai dengan nomor yang dipilih
+                    filteredData = filteredData.filter(s => s.batch && s.batch.startsWith(batchFilter));
+                }
+            }
+
+            // Urutkan: nomor batch dulu (1,2,4,5,6,7,8), lalu tanggal batch (terlama dulu)
+            const batchOrder = { '1': 1, '2': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7 };
+            const parseBatchDate = (batch) => {
+                if (!batch) return null;
+                const parts = batch.split('-');
+                if (parts.length >= 2) {
+                    const firstPart = parts[0];
+                    const secondPart = parts[1];
+                    
+                    // Format baru: 6.14-04-2026
+                    if (firstPart.includes('.')) {
+                        const numDate = firstPart.split('.');
+                        if (numDate.length >= 2) {
+                            const day = parseInt(numDate[1]);
+                            const dateStr = secondPart + '-' + parts[2];
+                            return new Date(dateStr);
+                        }
+                    }
+                    // Format lama: B001-17/4/2026
+                    const d = secondPart.split('/');
+                    if (d.length === 3) {
+                        return new Date(d[2], d[1] - 1, d[0]);
+                    }
+                }
+                return null;
+            };
+            filteredData.sort((a, b) => {
+                const getBatchNum = (batch) => {
+                    if (!batch) return 999;
+                    const firstChar = batch.charAt(0);
+                    return batchOrder[firstChar] || 8;
+                };
+                const aNum = getBatchNum(a.batch);
+                const bNum = getBatchNum(b.batch);
+                if (aNum !== bNum) return aNum - bNum;
+                const aDate = parseBatchDate(a.batch);
+                const bDate = parseBatchDate(b.batch);
+                if (aDate && bDate) return aDate - bDate;
+                if (aDate) return -1;
+                if (bDate) return 1;
+                return a.ukuran.localeCompare(b.ukuran);
+            });
+
+            document.getElementById('stockCount').textContent = filteredData.length;
+            container.innerHTML = '';
+            
+            filteredData.forEach((s) => {
+                const terjual = hitungTerjual(s.produk, s.ukuran, s.batch);
+                const sisa = s.jumlah - terjual;
+                
+                const idx = filteredData.indexOf(s);
+                const prev = idx > 0 ? filteredData[idx - 1] : null;
+                const isNewGroup = !prev || (prev.produk !== s.produk || prev.ukuran !== s.ukuran || prev.batch !== s.batch);
+                
+                const div = document.createElement('div');
+                div.className = 'stock-card';
+                div.innerHTML = `
+                    ${isNewGroup ? `<div class="group-header mb-2"><span class="fw-bold text-dark">${s.produk}</span> <span class="text-muted">${s.ukuran}</span></div>` : ''}
+                    <div class="stock-info">
+                        <div>
+                            <div class="batch-info">
+                                <i class="bi ${s.batch ? 'bi-upc' : 'bi-dash-circle'} me-1"></i>
+                                <span class="${s.batch ? '' : 'text-muted'}">${s.batch || 'Tanpa Batch'}</span>
+                            </div>
+                            ${s.exp ? `<div class="exp-info small text-muted mt-1"><i class="bi bi-calendar me-1"></i>Exp: ${s.exp}</div>` : ''}
+                        </div>
+                        <div class="stock-numbers">
+                            <div class="stock-badge ${sisa > 0 ? 'remaining' : 'text-danger'}">${sisa}</div>
+                            <div class="stock-label">sisa</div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="stock-badge total">${s.jumlah}</span>
+                        <span class="text-muted small">stok awal</span>
+                    </div>
+                    <div class="stock-actions">
+                        <button onclick="editStock(${s.originalIndex})" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-pencil me-1"></i> Edit
+                        </button>
+                        <button onclick="hapusStock(${s.originalIndex})" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-trash me-1"></i> Hapus
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // Render tabel ringkasan di kanan - Tampilkan per produk+ukuran+batch
+        function renderStockTable() {
+            const tbody = document.getElementById('stockTableBody');
+            tbody.innerHTML = '';
+
+            // Buat array dengan index asli dari stockData
+            const stockWithIndex = stockData.map((s, originalIndex) => ({ ...s, originalIndex }));
+            
+            // Urutkan berdasarkan nomor batch: 1, 2, 4, 5, 6, 7, 8 (tanpa batch di akhir)
+            const batchOrder = { '1': 1, '2': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7 };
+            stockWithIndex.sort((a, b) => {
+                // Ambil nomor batch dari awal batch string
+                const getBatchNum = (batch) => {
+                    if (!batch) return 999; // Tanpa batch di akhir
+                    const firstChar = batch.charAt(0);
+                    return batchOrder[firstChar] || 8;
+                };
+                const parseBatchDate = (batch) => {
+                    if (!batch) return null;
+                    const parts = batch.split('-');
+                    if (parts.length >= 2) {
+                        const firstPart = parts[0];
+                        const secondPart = parts[1];
+                        
+                        // Format baru: 6.14-04-2026
+                        if (firstPart.includes('.')) {
+                            const numDate = firstPart.split('.');
+                            if (numDate.length >= 2) {
+                                const dateStr = secondPart + '-' + parts[2];
+                                return new Date(dateStr);
+                            }
+                        }
+                        // Format lama: B001-17/4/2026
+                        const d = secondPart.split('/');
+                        if (d.length === 3) {
+                            return new Date(d[2], d[1] - 1, d[0]);
+                        }
+                    }
+                    return null;
+                };
+                const aNum = getBatchNum(a.batch);
+                const bNum = getBatchNum(b.batch);
+                if (aNum !== bNum) return aNum - bNum;
+                // Jika batch sama, urutkan berdasarkan tanggal (terlama dulu)
+                const aDate = parseBatchDate(a.batch);
+                const bDate = parseBatchDate(b.batch);
+                if (aDate && bDate) return aDate - bDate;
+                if (aDate) return -1;
+                if (bDate) return 1;
+                return a.ukuran.localeCompare(b.ukuran);
+            });
+
+            let totalRemaining = 0;
+
+            stockWithIndex.forEach(s => {
+                // Hitung terjual HANYA untuk batch yang cocok (exact match)
+                const terjual = hitungTerjual(s.produk, s.ukuran, s.batch);
+                const sisa = s.jumlah - terjual;
+                totalRemaining += sisa;
+
+                const batchDisplay = s.batch 
+                    ? `<span class="badge bg-light text-dark border"><i class="bi bi-upc me-1"></i>${s.batch}</span>` 
+                    : '<span class="text-muted">-</span>';
+                const rowClass = s.batch ? '' : 'no-batch-row';
+
+                tbody.innerHTML += `
+                    <tr class="${rowClass}">
+                        <td class="fw-bold">${s.produk}</td>
+                        <td><span class="badge bg-light text-dark border">${s.ukuran}</span></td>
+                        <td>${batchDisplay}</td>
+                        <td class="text-center"><span class="badge bg-primary fs-6">${s.jumlah}</span></td>
+                        <td class="text-center"><span class="badge bg-secondary">${terjual}</span></td>
+                        <td class="text-center pe-4">
+                            <span class="badge ${sisa > 0 ? 'bg-success' : 'bg-danger'} fs-6">${sisa}</span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('totalRemaining').textContent = totalRemaining;
+
+            if (stockWithIndex.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-2"></i>Belum ada data stok</td></tr>';
+            }
+        }
+
+        // Hitung terjual hari ini - dengan pencocokan batch yang tepat
+        function hitungTerjual(produk, ukuran, batch) {
+            const today = new Date();
+            const todayStr = today.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            
+            let total = 0;
+            orders.forEach(o => {
+                if (!o.createdAt) return;
+                
+                // Parse tanggal dari createdAt
+                const dateMatch = o.createdAt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                if (!dateMatch) return;
+                
+                const orderDate = `${dateMatch[1].padStart(2,'0')}/${dateMatch[2].padStart(2,'0')}/${dateMatch[3]}`;
+                
+                // Cek apakah hari ini
+                if (orderDate === todayStr) {
+                    o.products.forEach(p => {
+                        // Cocokkan produk, ukuran, DAN batch
+                        if (p.produk === produk && p.ukuran === ukuran) {
+                            if (batch === null) {
+                                // Untuk stok tanpa batch, hitung penjualan TANPA batch
+                                if (!p.batch || p.batch === '') {
+                                    total += parseInt(p.kuantitas || 0);
+                                }
+                            } else {
+                                // Untuk stok dengan batch, hitung penjualan dengan batch yang sama
+                                if (p.batch === batch) {
+                                    total += parseInt(p.kuantitas || 0);
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+            return total;
+        }
+
+        // Modal tambah stok
+        window.bukaModalTambah = function() {
+            document.getElementById('stockForm').reset();
+            document.getElementById('editStockIndex').value = '-1';
+            document.getElementById('stockModalTitle').innerHTML = '<i class="bi bi-plus-circle"></i> Tambah Stok';
+            document.getElementById('stockUkuran').innerHTML = '<option value="">-- Pilih Ukuran --</option>';
+            document.getElementById('batchExpContainer').style.display = 'none';
+            document.getElementById('stockProdDate').value = '';
+            document.getElementById('stockBatchExp').value = '';
+            new bootstrap.Modal(document.getElementById('stockModal')).show();
+        };
+
+        // Update ukuran saat produk dipilih
+        window.updateStockSizes = function() {
+            const produk = document.getElementById('stockProduk').value;
+            const select = document.getElementById('stockUkuran');
+            select.innerHTML = '<option value="">-- Pilih Ukuran --</option>';
+            
+            if (productData[produk]) {
+                productData[produk].forEach(s => {
+                    select.innerHTML += `<option value="${s}">${s}</option>`;
+                });
+            }
+        };
+
+        // Toggle batch fields based on produk
+        window.toggleBatchFields = function() {
+            const produk = document.getElementById('stockProduk').value;
+            const container = document.getElementById('batchExpContainer');
+            
+            // Semua produk yang ada di productData punya batch/exp
+            if (produk && productData[produk]) {
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+                document.getElementById('stockProdDate').value = '';
+                document.getElementById('stockBatchExp').value = '';
+            }
+        };
+
+        // Calculate Batch & Exp (sama seperti di index.html)
+        window.calculateStockBatchExp = function() {
+            const prodDateInput = document.getElementById('stockProdDate');
+            const display = document.getElementById('stockBatchExp');
+            const produk = document.getElementById('stockProduk').value;
+            const prodDate = prodDateInput.value;
+            
+            if (!prodDate || !produk) {
+                display.value = '';
+                return;
+            }
+            
+            const date = new Date(prodDate);
+            let batch = '';
+            let exp = '';
+            
+            if (produk === 'Madu') {
+                batch = '1.' + formatStockDate(date);
+                const expDate = new Date(date);
+                expDate.setFullYear(expDate.getFullYear() + 2);
+                exp = formatStockDate(expDate);
+            } else if (produk === 'Madu Sarang') {
+                batch = '2.' + formatStockDate(date);
+                const expDate = new Date(date);
+                expDate.setFullYear(expDate.getFullYear() + 2);
+                exp = formatStockDate(expDate);
+            } else if (produk === 'VCO') {
+                batch = '5.' + formatStockDate(date);
+                const expDate = new Date(date);
+                expDate.setFullYear(expDate.getFullYear() + 2);
+                exp = formatStockDate(expDate);
+            } else if (produk === 'Garlic') {
+                batch = '6.' + formatStockDate(date);
+                const expDate = new Date(date);
+                expDate.setMonth(expDate.getMonth() + 5);
+                exp = formatStockDate(expDate);
+            } else if (produk === 'Lemon') {
+                batch = '4.' + formatStockDate(date);
+                const expDate = new Date(date);
+                expDate.setMonth(expDate.getMonth() + 5);
+                exp = formatStockDate(expDate);
+            } else if (produk === 'Kunyit Asem') {
+                batch = '7.' + formatStockDate(date);
+                const expDate = new Date(date);
+                expDate.setDate(expDate.getDate() + 7);
+                exp = formatStockDate(expDate);
+            } else if (produk === 'Beras Kencur') {
+                batch = '8.' + formatStockDate(date);
+                const expDate = new Date(date);
+                expDate.setDate(expDate.getDate() + 7);
+                exp = formatStockDate(expDate);
+            }
+            
+            display.value = (batch ? 'Batch: ' + batch : '') + (exp ? (batch ? ' | ' : '') + 'Exp: ' + exp : '');
+        }
+
+        function formatStockDate(date) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+        }
+
+        // Edit stok
+        window.editStock = function(index) {
+            const s = stockData[index];
+            document.getElementById('editStockIndex').value = index;
+            document.getElementById('stockProduk').value = s.produk;
+            updateStockSizes();
+            toggleBatchFields();
+            document.getElementById('stockUkuran').value = s.ukuran;
+            
+            // Set batch/exp
+            if (s.batch) {
+                document.getElementById('stockProdDate').value = s.prodDate || '';
+                document.getElementById('stockBatchExp').value = (s.batch ? 'Batch: ' + s.batch : '') + (s.exp ? (s.batch ? ' | ' : '') + 'Exp: ' + s.exp : '');
+            } else {
+                document.getElementById('stockProdDate').value = '';
+                document.getElementById('stockBatchExp').value = '';
+            }
+            
+            document.getElementById('stockJumlah').value = s.jumlah;
+            document.getElementById('stockModalTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit Stok';
+            new bootstrap.Modal(document.getElementById('stockModal')).show();
+        };
+
+        // Hapus stok
+        window.hapusStock = function(index) {
+            if (confirm('Hapus data stok ini?')) {
+                stockData.splice(index, 1);
+                saveStock();
+                showToast('Stok dihapus', 'success');
+            }
+        };
+
+        // Submit form stok
+        document.getElementById('stockForm').onsubmit = (e) => {
+            e.preventDefault();
+            
+            const idx = document.getElementById('editStockIndex').value;
+            const batchExpValue = document.getElementById('stockBatchExp').value;
+            
+            // Parse batch dan exp dari display
+            let batch = null;
+            let exp = null;
+            let prodDate = null;
+            
+            if (batchExpValue) {
+                const batchMatch = batchExpValue.match(/Batch:\s*(.+?)(?:\s*\||$)/);
+                const expMatch = batchExpValue.match(/Exp:\s*(.+?)$/);
+                
+                if (batchMatch) batch = batchMatch[1].trim();
+                if (expMatch) exp = expMatch[1].trim();
+                prodDate = document.getElementById('stockProdDate').value;
+            }
+            
+            const data = {
+                produk: document.getElementById('stockProduk').value,
+                ukuran: document.getElementById('stockUkuran').value,
+                batch: batch,
+                exp: exp,
+                prodDate: prodDate,
+                jumlah: parseInt(document.getElementById('stockJumlah').value)
+            };
+
+            if (idx === '-1') {
+                stockData.push(data);
+                showToast('Stok ditambahkan!', 'success');
+            } else {
+                stockData[idx] = data;
+                showToast('Stok diperbarui!', 'success');
+            }
+
+            saveStock();
+            bootstrap.Modal.getInstance(document.getElementById('stockModal')).hide();
+        };
+
+        // Toast notification
+        function showToast(message, type = "success") {
+            const toastArea = document.getElementById('toastArea');
+            const bgClass = type === "success" ? "bg-success" : "bg-danger";
+            const iconClass = type === "success" ? "bi-check-circle" : "bi-exclamation-triangle";
+
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white ${bgClass} border-0`;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            toast.style.marginBottom = '10px';
+
+            toast.innerHTML = `
+                <div class="toast-body fw-bold d-flex align-items-center">
+                    <i class="bi ${iconClass} me-2"></i> ${message}
+                    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+
+            toastArea.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Init
+        document.getElementById('todayDate').textContent = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        loadAllData();
+        
+        // Hapus auto-refresh agar tidak terus loading
+        // Jika ingin refresh manual, bisa tambahkan tombol
+    </script>
+</body>
+</html>
