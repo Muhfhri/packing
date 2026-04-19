@@ -209,9 +209,11 @@
             background: rgba(255,255,255,0.15);
             border-radius: 12px;
             padding: 16px;
+            margin: 1vh;
             text-align: center;
             backdrop-filter: blur(10px);
             transition: all 0.3s ease;
+            height: 100%;
         }
         
         .sales-item:hover {
@@ -743,13 +745,13 @@
             });
 
             // Render summary cards (clickable)
-            container.innerHTML = '<div class="row g-3">';
+            container.innerHTML = '<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3">';
             
             for (const key in productSummary) {
                 const s = productSummary[key];
                 container.innerHTML += `
-                    <div class="col-md-4 col-sm-6">
-                        <div class="sales-item" onclick="showTodaySalesDetail('${key}')" style="cursor: pointer;" title="Klik untuk lihat detail pembeli">
+                    <div class="col">
+                        <div class="sales-item" onclick="showTodaySalesDetail('${key}')" title="Klik untuk lihat detail pembeli">
                             <div class="product-name">${s.produk}</div>
                             <div class="product-size">${s.ukuran}</div>
                             <div class="qty-badge">${s.count} terjual</div>
@@ -921,7 +923,7 @@
                         </div>
                         <div class="stock-numbers">
                             <div class="stock-badge ${sisa > 0 ? 'remaining' : 'text-danger'}">${sisa}</div>
-                            <div class="stock-label">sisa</div>
+                            <div class="stock-label">Tersisa</div>
                         </div>
                     </div>
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -1267,7 +1269,7 @@
             } else if (produk === 'Garlic') {
                 batch = '6.' + formatStockDate(date);
                 const expDate = new Date(date);
-                expDate.setMonth(expDate.getMonth() + 5);
+                expDate.setMonth(expDate.getMonth() + 6);
                 exp = formatStockDate(expDate);
             } else if (produk === 'Lemon') {
                 batch = '4.' + formatStockDate(date);
